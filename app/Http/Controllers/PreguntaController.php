@@ -13,7 +13,7 @@ use Illuminate\Http\JsonResponse;
 
 class PreguntaController extends Controller
 {
-    public function show(Conjunto $conjunto, Pregunta $pregunta): View
+    public function show(Conjunto $conjunto, Pregunta $pregunta): View|RedirectResponse
     {
         // Verificar que la pregunta pertenece al conjunto
         abort_if($pregunta->conjunto_id !== $conjunto->id, 404);

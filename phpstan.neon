@@ -17,8 +17,3 @@ parameters:
         - resources/views/vendor/*
         - resources/views/livewire/settings/*
         - app/Livewire/Actions/*
-
-    ignoreErrors:
-        - '#Parameter \#1 \$view of function view expects view-string\|null, string given#'
-        - identifier: missingType.iterableValue
-        - identifier: missingType.generics
