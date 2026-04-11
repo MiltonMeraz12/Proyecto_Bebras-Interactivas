@@ -2,123 +2,117 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Conjunto;
 use App\Models\Pregunta;
 use App\Models\ProgresoUsuario;
+use App\Models\SesionConjunto;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 
 class PreguntaController extends Controller
 {
-    public function index()
+    public function show(Conjunto $conjunto, Pregunta $pregunta): View
     {
-        if (auth()->check() && auth()->user()->isAlumno()) {
-            $preguntas = Pregunta::activas()->orderBy('numero')->get();
-        } else {
-            // Admin ve todas
-            $preguntas = Pregunta::orderBy('numero')->get();
-        }
-        
-        if (auth()->check()) {
-            $progreso = ProgresoUsuario::where('user_id', auth()->id())
-                ->pluck('es_correcta', 'pregunta_id');
-        } else {
-            $progreso = collect();
-        }
-        
-        return view('preguntas.index', compact('preguntas', 'progreso'));
-    }
+        // Verificar que la pregunta pertenece al conjunto
+        abort_if($pregunta->conjunto_id !== $conjunto->id, 404);
+        abort_if(!$pregunta->activa && auth()->user()->isAlumno(), 403);
 
-    public function show($id)
-    {
-        $id = (int) $id;
-        $pregunta = Pregunta::findOrFail($id);
-
-        // Verificar si el alumno puede ver esta pregunta
-        if (auth()->check() && auth()->user()->isAlumno() && !$pregunta->activa) {
-            abort(403, 'Esta pregunta no está disponible en este momento.');
-        }
-
-        // Verificar si ya respondió
-        $progresoUsuario = null;
-        $yaRespondio = false;
-
-        if (auth()->check()) {
-            $progresoUsuario = ProgresoUsuario::where('user_id', auth()->id())
-                ->where('pregunta_id', $id)
-                ->first();
-            
-            $yaRespondio = $progresoUsuario !== null;
-        }
-        
-        return view('preguntas.show', compact('pregunta', 'progresoUsuario', 'yaRespondio'));
-    }
-
-    public function verificar(Request $request, $id)
-    {
-        $id = (int) $id;
-        $pregunta = Pregunta::findOrFail($id);
-
-        if (!auth()->check()) {
-            return response()->json([
-                'error' => true,
-                'mensaje' => 'Debes estar autenticado para verificar respuestas.'
-            ], 401);
-        }
-        
-        // Verificar si ya respondió
-        $progresoExistente = ProgresoUsuario::where('user_id', auth()->id())
-            ->where('pregunta_id', $id)
+        // El alumno debe tener sesión activa
+        $sesion = SesionConjunto::where('user_id', auth()->id())
+            ->where('conjunto_id', $conjunto->id)
             ->first();
-        
-        if ($progresoExistente && auth()->user()->isAlumno()) {
+
+        if (!$sesion && auth()->user()->isAlumno()) {
+            return redirect()->route('conjuntos.show', $conjunto)
+                ->with('error', 'Debes iniciar el conjunto antes de responder.');
+        }
+
+        // Si ya terminó, redirigir a resultados
+        if ($sesion?->estaTerminada() && auth()->user()->isAlumno()) {
+            return redirect()->route('conjuntos.resultados', $conjunto);
+        }
+
+        $progreso = ProgresoUsuario::where('user_id', auth()->id())
+            ->where('pregunta_id', $pregunta->id)
+            ->first();
+
+        // Navegación: pregunta anterior y siguiente
+        $preguntas  = $conjunto->preguntas()->activas()->orderBy('orden')->pluck('id');
+        $posicion   = $preguntas->search($pregunta->id);
+        $anteriorId = $posicion > 0 ? $preguntas[$posicion - 1] : null;
+        $siguienteId= $posicion < $preguntas->count() - 1 ? $preguntas[$posicion + 1] : null;
+
+        $anterior = $anteriorId ? Pregunta::find($anteriorId) : null;
+        $siguiente= $siguienteId ? Pregunta::find($siguienteId) : null;
+        $progresoUsuario = $progreso;
+
+        return view('preguntas.show', compact(
+            'conjunto', 'pregunta', 'progreso', 'anterior', 'siguiente', 'preguntas', 'posicion', 'progresoUsuario', 'sesion'
+        ));
+    }
+
+    public function verificar(Request $request, Conjunto $conjunto, Pregunta $pregunta): JsonResponse
+    {
+        abort_if($pregunta->conjunto_id !== $conjunto->id, 404);
+
+        // Verificar sesión activa
+        $sesion = SesionConjunto::where('user_id', auth()->id())
+            ->where('conjunto_id', $conjunto->id)
+            ->firstOrFail();
+
+        if ($sesion->estaTerminada()) {
             return response()->json([
-                'error' => true,
-                'mensaje' => 'Ya respondiste esta pregunta anteriormente.'
+                'error'   => true,
+                'mensaje' => 'Este conjunto ya fue finalizado.',
             ], 403);
+        }
+
+        // Evitar doble envío
+        $yaRespondio = ProgresoUsuario::where('user_id', auth()->id())
+            ->where('pregunta_id', $pregunta->id)
+            ->exists();
+
+        if ($yaRespondio) {
+            return response()->json([
+                'error'   => true,
+                'mensaje' => 'Ya respondiste esta pregunta.',
+            ], 422);
         }
 
         $request->validate([
             'respuesta' => ['present'],
-        ], [
-            'respuesta.present' => 'Debes enviar una respuesta.',
         ]);
 
-        $respuestaUsuario = $request->input('respuesta');
-        $respuestaCorrecta = $pregunta->respuesta_correcta;
-        $configuracion = $pregunta->configuracion ?? [];
-        
         $esCorrecta = $this->validarRespuesta(
-            $pregunta->tipo_interaccion, 
-            $respuestaUsuario, 
-            $respuestaCorrecta,
-            $configuracion
+            $pregunta->tipo_interaccion,
+            $request->input('respuesta'),
+            $pregunta->respuesta_correcta,
+            $pregunta->configuracion ?? []
         );
-        
-        // Guardar progreso
-        if (auth()->check()) {
-            ProgresoUsuario::create([
-                'user_id' => auth()->id(),
-                'pregunta_id' => $id,
-                'respuesta_usuario' => $respuestaUsuario,
-                'es_correcta' => $esCorrecta,
-                'completada_at' => now(),
-            ]);
-        }
-        
+
+        ProgresoUsuario::create([
+            'user_id'          => auth()->id(),
+            'pregunta_id'      => $pregunta->id,
+            'respuesta_usuario'=> $request->input('respuesta'),
+            'es_correcta'      => $esCorrecta,
+            'completada_at'    => now(),
+        ]);
+
         return response()->json([
-            'correcta' => $esCorrecta,
-            'explicacion' => $pregunta->explicacion,
-            'respuesta_correcta_visual' => $this->formatearRespuestaCorrecta($pregunta->tipo_interaccion, $respuestaCorrecta),
-            'imagen_respuesta' => $pregunta->imagen_respuesta,
+            'correcta'                 => $esCorrecta,
+            'explicacion'              => $pregunta->explicacion,
+            'respuesta_correcta_visual'=> $this->formatearRespuestaCorrecta(
+                                             $pregunta->tipo_interaccion,
+                                             $pregunta->respuesta_correcta
+                                         ),
+            'imagen_explicacion'       => $pregunta->imagen_explicacion,
         ]);
     }
 
-    /**
-     * Valida la respuesta del usuario contra la respuesta correcta.
-     * Convención: en las vistas, cada inciso usa el campo 'id' de la opción (ej. 'A', 'B', '1', 'manzana').
-     * El front envía ese mismo 'id' (seleccion_simple: [id], seleccion_multiple: [id1, id2], etc.).
-     * respuesta_correcta en BD debe usar exactamente los mismos ids que configuracion.opciones[].id.
-     */
-    private function validarRespuesta($tipo, $usuario, $correcta, $configuracion = [])
+    // Validaciones
+    private function validarRespuesta($tipo, $usuario, $correcta, $configuracion = []): bool
     {
         if (!$usuario || empty($tipo)) {
             return false;
@@ -166,14 +160,14 @@ class PreguntaController extends Controller
         }
     }
 
-    private function validarSeleccionSimple($usuario, $correcta)
+    private function validarSeleccionSimple($usuario, $correcta): bool
     {
         // $correcta puede ser ['B'] o [['B']]
         $correctaFlat = is_array($correcta[0] ?? null) ? $correcta[0] : $correcta;
         return isset($usuario[0]) && in_array($usuario[0], $correctaFlat);
     }
 
-    private function validarSeleccionMultiple($usuario, $correcta)
+    private function validarSeleccionMultiple($usuario, $correcta): bool
     {
         // Verificar si es formato de computadoras (pregunta 23)
         if (isset($correcta[0]) && is_array($correcta[0]) && isset($correcta[0]['computadora'])) {
@@ -204,38 +198,51 @@ class PreguntaController extends Controller
         }
         
         // Formato estándar: $correcta puede ser [['1', '2', '3']] o ['1', '2', '3']
-        $correctaFlat = is_array($correcta[0] ?? null) && is_string($correcta[0]) 
-            ? $correcta 
-            : ($correcta[0] ?? []);
+        $correctaFlat = is_array($correcta[0] ?? null) && !is_string($correcta[0] ?? null)
+            ? ($correcta[0] ?? [])
+            : $correcta;
         
         if (count($usuario) !== count($correctaFlat)) {
             return false;
         }
         
+        $usuarioSorted  = $usuario;
+        $correctaSorted = $correctaFlat;
         sort($usuario);
         sort($correctaFlat);
         
         return $usuario === $correctaFlat;
     }
 
-    private function validarOrdenar($usuario, $correcta)
+    private function validarOrdenar($usuario, $correcta): bool
     {
         // Verificar si hay múltiples respuestas correctas posibles
-        if (isset($correcta[0]) && is_array($correcta[0])) {
-            // Múltiples soluciones posibles
-            foreach ($correcta as $solucion) {
-                if ($usuario === $solucion) {
-                    return true;
+        $soluciones = isset($correcta[0]) && is_array($correcta[0]) ? $correcta : [$correcta];
+        foreach ($soluciones as $solucion) {
+            if ($usuario === $solucion) return true;
+        }
+        return false;
+    }
+
+    private function validarGrid($usuario, $correcta): bool
+    {
+        if (!is_array($usuario) || count($usuario) !== count($correcta)) return false;
+
+        foreach ($correcta as $celdaCorrecta) {
+            $encontrada = false;
+            foreach ($usuario as $celdaUsuario) {
+                if (($celdaUsuario['fila'] ?? null) == ($celdaCorrecta['fila'] ?? null)
+                    && ($celdaUsuario['columna'] ?? null) == ($celdaCorrecta['columna'] ?? null)) {
+                    $encontrada = true;
+                    break;
                 }
             }
-            return false;
+            if (!$encontrada) return false;
         }
-        
-        // Una sola solución
-        return $usuario === $correcta;
+        return true;
     }
 
-    private function validarGrid($usuario, $correcta)
+    private function validarEmparejar($usuario, $correcta): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -245,53 +252,21 @@ class PreguntaController extends Controller
             return false;
         }
         
-        $usuarioSet = collect($usuario)
-            ->map(function($r) {
-                return "{$r['fila']}-{$r['columna']}";
-            })
-            ->sort()
-            ->values()
-            ->toArray();
-            
-        $correctaSet = collect($correcta)
-            ->map(function($r) {
-                return "{$r['fila']}-{$r['columna']}";
-            })
-            ->sort()
-            ->values()
-            ->toArray();
-        
-        return $usuarioSet === $correctaSet;
-    }
-
-    private function validarEmparejar($usuario, $correcta)
-    {
-        if (!is_array($usuario) || !is_array($correcta)) {
-            return false;
-        }
-
-        if (count($usuario) !== count($correcta)) {
-            return false;
-        }
-        
-        foreach ($correcta as $emparejamiento) {
+        foreach ($correcta as $parCorrecto) {
             $encontrado = false;
-            foreach ($usuario as $respuesta) {
-                if ($respuesta['objeto'] === $emparejamiento['objeto'] && 
-                    $respuesta['destino'] === $emparejamiento['destino']) {
+            foreach ($usuario as $parUsuario) {
+                if (($parUsuario['objeto'] ?? null) == ($parCorrecto['objeto'] ?? null)
+                    && ($parUsuario['destino'] ?? null) == ($parCorrecto['destino'] ?? null)) {
                     $encontrado = true;
                     break;
                 }
             }
-            if (!$encontrado) {
-                return false;
-            }
+            if (!$encontrado) return false;
         }
-        
         return true;
     }
 
-    private function validarRellenar($usuario, $correcta, $configuracion = [])
+    private function validarRellenar($usuario, $correcta, $configuracion = []): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -322,7 +297,7 @@ class PreguntaController extends Controller
         return $this->compararRellenar($usuario, $correcta);
     }
     
-    private function compararRellenar($usuario, $correcta)
+    private function compararRellenar($usuario, $correcta): bool
     {
         // Verificar que todas las áreas tengan el color correcto
         foreach ($correcta as $colorCorrecto) {
@@ -341,7 +316,7 @@ class PreguntaController extends Controller
         return true;
     }
     
-    private function validarRellenarFlexible($usuario, $configuracion)
+    private function validarRellenarFlexible($usuario, $configuracion): bool
     {
         // Validar que áreas adyacentes no tengan el mismo color
         // Esto requiere definir qué áreas son adyacentes en la configuración
@@ -453,7 +428,7 @@ class PreguntaController extends Controller
         return true;
     }
 
-    private function validarTextoLibre($usuario, $correcta)
+    private function validarTextoLibre($usuario, $correcta): bool
     {
         // Validar que el usuario envió algo
         if (!isset($usuario[0]) || empty(trim($usuario[0]))) {
@@ -484,7 +459,7 @@ class PreguntaController extends Controller
         return false;
     }
 
-    private function validarColocarPiezas($usuario, $correcta)
+    private function validarColocarPiezas($usuario, $correcta): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -522,7 +497,7 @@ class PreguntaController extends Controller
         return true;
     }
 
-    private function validarRompecabezasHexagonos($usuario, $correcta)
+    private function validarRompecabezasHexagonos($usuario, $correcta): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -561,7 +536,7 @@ class PreguntaController extends Controller
         return true;
     }
 
-    private function validarColorearHexagonos($usuario, $correcta)
+    private function validarColorearHexagonos($usuario, $correcta): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -607,7 +582,7 @@ class PreguntaController extends Controller
         return true;
     }
 
-    private function validarTejerAlfombra($usuario, $correcta)
+    private function validarTejerAlfombra($usuario, $correcta): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -643,7 +618,7 @@ class PreguntaController extends Controller
         return true;
     }
 
-    private function validarCompletar($usuario, $correcta, $configuracion = [])
+    private function validarCompletar($usuario, $correcta, $configuracion = []): bool
     {
         if (!$usuario || !$correcta) {
             return false;
@@ -695,7 +670,7 @@ class PreguntaController extends Controller
         return false;
     }
 
-    private function compararCompletarObjeto($usuario, $correcta)
+    private function compararCompletarObjeto($usuario, $correcta): bool
     {
         if (!is_array($usuario) || !is_array($correcta)) {
             return false;
@@ -718,7 +693,7 @@ class PreguntaController extends Controller
         return true;
     }
 
-    private function formatearRespuestaCorrecta($tipo, $correcta)
+    private function formatearRespuestaCorrecta($tipo, $correcta): string
     {
         switch ($tipo) {
             case 'seleccion_simple':

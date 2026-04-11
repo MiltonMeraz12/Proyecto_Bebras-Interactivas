@@ -1,270 +1,310 @@
-<x-layouts.app :title="$pregunta->titulo . ' - Bebras Lab'">
-    @if(in_array($pregunta->tipo_interaccion, ['seleccion_simple', 'seleccion_multiple', 'completar']))
-    <style>
-        /* Borde eléctrico neón (cian → violeta → magenta) para opciones seleccionadas */
-        .opcion-seleccionada-multicolor:has(input:checked),
-        .opcion-seleccion-multicolor:has(input:checked),
-        .opcion-btn.opcion-seleccionada {
-            border: 4px solid transparent !important;
-            background: linear-gradient(#e0f7ff, #e0f7ff) padding-box,
-                        linear-gradient(90deg, #00f5ff 0%, #bf00ff 50%, #ff00aa 100%) border-box !important;
-            background-origin: border-box !important;
-            background-clip: padding-box, border-box !important;
-            box-shadow: 0 4px 24px rgba(0, 245, 255, 0.45), 0 0 0 1px rgba(191, 0, 255, 0.3) !important;
-        }
-        .dark .opcion-seleccionada-multicolor:has(input:checked),
-        .dark .opcion-seleccion-multicolor:has(input:checked),
-        .dark .opcion-btn.opcion-seleccionada {
-            background: linear-gradient(#1a1a2e, #1a1a2e) padding-box,
-                        linear-gradient(90deg, #00f5ff 0%, #bf00ff 50%, #ff00aa 100%) border-box !important;
-            background-origin: border-box !important;
-            background-clip: padding-box, border-box !important;
-            box-shadow: 0 4px 24px rgba(0, 245, 255, 0.55), 0 0 0 1px rgba(191, 0, 255, 0.4) !important;
-        }
-        /* Borde eléctrico al hacer hover o click (feedback inmediato) */
-        .opcion-btn:hover,
-        .opcion-btn:active,
-        .opcion-seleccionada-multicolor:hover,
-        .opcion-seleccionada-multicolor:active {
-            border: 4px solid transparent !important;
-            background: linear-gradient(#e0f7ff, #e0f7ff) padding-box,
-                        linear-gradient(90deg, #00f5ff 0%, #bf00ff 50%, #ff00aa 100%) border-box !important;
-            background-origin: border-box !important;
-            background-clip: padding-box, border-box !important;
-            box-shadow: 0 4px 24px rgba(0, 245, 255, 0.45), 0 0 0 1px rgba(191, 0, 255, 0.3) !important;
-        }
-        .dark .opcion-btn:hover,
-        .dark .opcion-btn:active,
-        .dark .opcion-seleccionada-multicolor:hover,
-        .dark .opcion-seleccionada-multicolor:active {
-            background: linear-gradient(#1a1a2e, #1a1a2e) padding-box,
-                        linear-gradient(90deg, #00f5ff 0%, #bf00ff 50%, #ff00aa 100%) border-box !important;
-            background-origin: border-box !important;
-            background-clip: padding-box, border-box !important;
-            box-shadow: 0 4px 24px rgba(0, 245, 255, 0.55), 0 0 0 1px rgba(191, 0, 255, 0.4) !important;
-        }
-    </style>
-    @endif
-    @if($pregunta->tipo_interaccion === 'ordenar')
-        <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-    @endif
+<x-layouts.app :title="$pregunta->titulo">
+    <div class="flex flex-col gap-4 p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto">
 
-    <div class="flex flex-col gap-6 p-4 lg:p-6">
+        {{-- Barra de progreso del conjunto --}}
+        @php
+            $total       = $preguntas->count();
+            $actual      = $posicion + 1;
+            $pctBarra    = $total > 0 ? round(($actual / $total) * 100) : 0;
+            // Cuántas preguntas de este conjunto ya tiene respuesta el alumno
+            $respondidas = \App\Models\ProgresoUsuario::where('user_id', auth()->id())
+                ->whereIn('pregunta_id', $preguntas->pluck('id'))
+                ->count();
+        @endphp
 
-        {{-- Barra superior: volver + número de pregunta --}}
-        <div class="bg-white dark:bg-neutral-900 rounded-2xl shadow-lg border border-neutral-200 dark:border-neutral-800 px-3 sm:px-4 py-3 flex items-center justify-between gap-2">
-            <a href="{{ route('preguntas.index') }}"
-               class="text-pink-600 hover:text-pink-700 dark:text-pink-400 dark:hover:text-pink-300 flex items-center gap-1.5 sm:gap-2 font-semibold text-sm sm:text-base transition-colors min-h-[44px] min-w-[44px] flex-shrink-0"
->
-                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-                <span class="hidden xs:inline sm:inline">Volver</span>
-            </a>
-            <span class="text-xs sm:text-sm font-semibold text-neutral-700 dark:text-neutral-300 bg-neutral-100 dark:bg-neutral-800 px-3 sm:px-4 py-1.5 rounded-full whitespace-nowrap">
-                {{ $pregunta->numero }}/27
-            </span>
-        </div>
-
-        {{-- Descripción --}}
-        <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-6">
-            <h2 class="text-xl font-bold text-neutral-900 dark:text-white mb-2">
-                {{ $pregunta->numero }}. {{ $pregunta->titulo }}
-            </h2>
-            <div class="flex gap-2 mb-4">
-                <span class="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold">Nivel {{ $pregunta->nivel }}</span>
-                <span class="px-2.5 py-1 rounded-full text-xs font-semibold
-                    {{ $pregunta->dificultad === 'Baja' ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : '' }}
-                    {{ $pregunta->dificultad === 'Media' ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' : '' }}
-                    {{ $pregunta->dificultad === 'Alta' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300' : '' }}">
-                    {{ $pregunta->dificultad }}
-                </span>
+        <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow px-5 py-3">
+            <div class="flex items-center justify-between text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">
+                <a href="{{ route('conjuntos.show', $conjunto) }}"
+                   class="flex items-center gap-1 text-pink-600 dark:text-pink-400 hover:underline font-semibold"
+                   wire:navigate>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    {{ Str::limit($conjunto->nombre, 30) }}
+                </a>
+                <div class="flex items-center gap-3">
+                    <span class="text-neutral-400">{{ $respondidas }}/{{ $total }} respondidas</span>
+                    <span class="font-semibold">{{ $actual }} de {{ $total }}</span>
+                </div>
             </div>
-            <p class="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line">{{ $pregunta->descripcion }}</p>
-            @if($pregunta->imagen_descripcion)
-                <div class="mt-4 flex justify-center overflow-x-auto">
-                    <img src="{{ asset('storage/' . $pregunta->imagen_descripcion) }}" alt="Descripción"
-                         class="max-w-full max-h-36 sm:max-h-48 rounded-xl shadow-lg object-contain border border-neutral-200 dark:border-neutral-700">
-                </div>
-            @endif
+            {{-- Barra de posición actual --}}
+            <div class="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 h-1.5 rounded-full transition-all duration-500"
+                     style="width: {{ $pctBarra }}%"></div>
+            </div>
+            {{-- Miniaturas de navegación rápida (solo en desktop) --}}
+            <div class="hidden md:flex gap-1 mt-2 overflow-x-auto pb-1">
+                @foreach($preguntas as $i => $p)
+                    @php
+                        $prog = \App\Models\ProgresoUsuario::where('user_id', auth()->id())
+                            ->where('pregunta_id', $p)->first();
+                        $esActual = $p === $pregunta->id;
+                    @endphp
+                    <a href="{{ route('preguntas.show', [$conjunto, $p]) }}"
+                       wire:navigate
+                       class="flex-shrink-0 w-7 h-7 rounded-lg text-xs font-bold flex items-center justify-center transition-all
+                           {{ $esActual
+                               ? 'bg-pink-500 text-white shadow-md scale-110'
+                               : ($prog
+                                   ? ($prog->es_correcta
+                                       ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+                                       : 'bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400')
+                                   : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 hover:bg-neutral-200') }}"
+                       title="Pregunta {{ $i + 1 }}">
+                        {{ $i + 1 }}
+                    </a>
+                @endforeach
+            </div>
         </div>
 
-        {{-- Pregunta e interacción --}}
-        <div class="bg-white dark:bg-neutral-900 rounded-3xl shadow-xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-6">
-            <h3 class="text-lg font-bold text-neutral-800 dark:text-white mb-4 pb-3 border-b-2 border-pink-500">
-                {{ $pregunta->pregunta }}
-            </h3>
-            @if($pregunta->imagen_pregunta)
-                <div class="mb-4 flex justify-center overflow-x-auto">
-                    <img src="{{ asset('storage/' . $pregunta->imagen_pregunta) }}" alt="Pregunta"
-                         class="max-w-full max-h-36 sm:max-h-48 rounded-xl shadow-lg object-contain border border-neutral-200 dark:border-neutral-700">
-                </div>
-            @endif
+        {{-- Tarjeta de la pregunta --}}
+        <div class="bg-white/95 dark:bg-neutral-900/90 border border-yellow-300/70 dark:border-neutral-700 rounded-3xl shadow-xl overflow-hidden">
 
-            <div id="contenedor-interaccion" class="mb-4">
-                @if(!empty($pregunta->tipo_interaccion))
-                    @php
-                        $tipoVista = 'preguntas.tipos.' . $pregunta->tipo_interaccion;
-                        $vistaExiste = view()->exists($tipoVista);
-                    @endphp
-                    @if($vistaExiste)
-                        @include($tipoVista, ['config' => $pregunta->configuracion, 'pregunta' => $pregunta])
-                    @else
-                        <div class="bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-700 rounded-2xl p-6 text-center">
-                            <h4 class="text-lg font-bold text-red-800 dark:text-red-200 mb-2">Vista No Encontrada</h4>
-                            <p class="text-red-700 dark:text-red-300 text-sm">No se encontró la vista para el tipo: <strong>{{ $pregunta->tipo_interaccion }}</strong></p>
-                        </div>
+            {{-- Header --}}
+            <div class="px-6 pt-6 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+                <div class="flex items-center gap-3 flex-wrap mb-2">
+                    @if($pregunta->nivel)
+                        <span class="px-2.5 py-0.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-semibold">
+                            Nivel {{ $pregunta->nivel }}
+                        </span>
                     @endif
+                    @if($pregunta->dificultad)
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold
+                            {{ $pregunta->dificultad === 'Baja'  ? 'bg-green-50  dark:bg-green-900/30  text-green-700  dark:text-green-300'  : '' }}
+                            {{ $pregunta->dificultad === 'Media' ? 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' : '' }}
+                            {{ $pregunta->dificultad === 'Alta'  ? 'bg-red-50    dark:bg-red-900/30    text-red-700    dark:text-red-300'    : '' }}">
+                            {{ $pregunta->dificultad }}
+                        </span>
+                    @endif
+                    @if($pregunta->pais_origen)
+                        <span class="text-xs text-neutral-400 dark:text-neutral-500">{{ $pregunta->pais_origen }}</span>
+                    @endif
+                    @if($pregunta->codigo_tarea)
+                        <span class="text-xs text-neutral-300 dark:text-neutral-600 font-mono">{{ $pregunta->codigo_tarea }}</span>
+                    @endif
+                </div>
+                <h1 class="text-xl md:text-2xl font-extrabold text-neutral-900 dark:text-white">
+                    {{ $pregunta->titulo }}
+                </h1>
+            </div>
+
+            {{-- Enunciado --}}
+            <div class="px-6 py-5">
+                <div class="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300 leading-relaxed">
+                    {!! nl2br(e($pregunta->enunciado)) !!}
+                </div>
+                @if($pregunta->imagen_enunciado)
+                    <div class="mt-4 rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800">
+                        <img src="{{ asset('storage/' . $pregunta->imagen_enunciado) }}"
+                             alt="Imagen del enunciado"
+                             class="w-full object-contain max-h-80 mx-auto">
+                    </div>
+                @endif
+            </div>
+
+            {{-- Área de interacción --}}
+            <div class="px-6 pb-6" id="area-interaccion">
+                @if(!empty($pregunta->tipo_interaccion))
+                    @include('preguntas.tipos.' . $pregunta->tipo_interaccion, [
+                        'config'          => $pregunta->configuracion,
+                        'progreso'        => $progreso,
+                        'progresoUsuario' => $progreso,
+                    ])
                 @else
-                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-400 dark:border-yellow-700 rounded-2xl p-6 text-center">
-                        <h4 class="text-lg font-bold text-yellow-800 dark:text-yellow-200 mb-2">Tipo de Interacción No Implementado</h4>
-                        <p class="text-yellow-700 dark:text-yellow-300 text-sm">Esta pregunta aún no tiene un tipo de interacción implementado.</p>
+                    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-2xl p-4 text-yellow-700 dark:text-yellow-300 text-sm">
+                        ⚠️ Esta pregunta aún no tiene un tipo de interacción implementado.
                     </div>
                 @endif
             </div>
 
             {{-- Botón verificar --}}
-            <button id="btnVerificar"
-                    onclick="verificarRespuesta()"
-                    @if(empty($pregunta->tipo_interaccion)) disabled @endif
-                    class="w-full min-h-[48px] bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-white py-3.5 px-4 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 font-bold text-sm sm:text-base flex items-center justify-center gap-2 touch-manipulation @if(empty($pregunta->tipo_interaccion)) opacity-50 cursor-not-allowed @endif">
-                @if(empty($pregunta->tipo_interaccion))
-                    Tipo de Interacción No Disponible
-                @else
-                    <span>Verificar Respuesta</span>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                @endif
-            </button>
+            @if(!$progreso)
+                <div class="px-6 pb-6">
+                    <button id="btn-verificar"
+                            onclick="verificarRespuesta()"
+                            class="w-full bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-white font-bold py-3.5 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 text-base cursor-pointer">
+                        Verificar respuesta
+                    </button>
+                </div>
+            @endif
 
-            <div id="resultado" class="hidden mt-4"></div>
+            {{-- Panel de resultado --}}
+            <div id="panel-resultado" class="{{ $progreso ? '' : 'hidden' }} px-6 pb-6">
+                <div id="resultado-contenido"
+                     class="rounded-2xl p-5 border
+                        {{ $progreso?->es_correcta
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                            : ($progreso ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700') }}">
 
-            {{-- Navegación --}}
-            <div id="navegacion" class="hidden mt-4 flex flex-col sm:flex-row gap-3">
-                @php
-                    $preguntaAnterior = \App\Models\Pregunta::where('numero', '<', $pregunta->numero)->orderBy('numero', 'desc')->first();
-                    $preguntaSiguiente = \App\Models\Pregunta::where('numero', '>', $pregunta->numero)->orderBy('numero', 'asc')->first();
-                @endphp
-                @if($preguntaAnterior)
-                    <a href="{{ route('preguntas.show', $preguntaAnterior->id) }}"
-                       class="flex-1 min-h-[44px] py-2.5 px-4 rounded-2xl font-semibold text-sm border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2 touch-manipulation"
->
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-                        Anterior
-                    </a>
-                @else
-                    <div class="flex-1"></div>
-                @endif
-                @if($preguntaSiguiente)
-                    <a href="{{ route('preguntas.show', $preguntaSiguiente->id) }}"
-                       class="flex-1 min-h-[44px] bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-white py-2.5 px-4 rounded-2xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 touch-manipulation"
->
-                        Siguiente
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                @else
-                    <a href="{{ route('preguntas.index') }}"
-                       class="flex-1 min-h-[44px] bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-white py-2.5 px-4 rounded-2xl font-semibold text-sm shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 touch-manipulation"
->
-                        Finalizar
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                    </a>
-                @endif
+                    @if($progreso)
+                        <div class="flex items-center gap-3 mb-3">
+                            @if($progreso->es_correcta)
+                                <span class="text-2xl">✅</span>
+                                <span class="font-bold text-green-700 dark:text-green-300 text-lg">¡Correcto!</span>
+                            @else
+                                <span class="text-2xl">❌</span>
+                                <span class="font-bold text-red-700 dark:text-red-300 text-lg">Incorrecto</span>
+                            @endif
+                        </div>
+                        @if($pregunta->explicacion)
+                            <p class="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">{{ $pregunta->explicacion }}</p>
+                        @endif
+                        @if($pregunta->imagen_explicacion)
+                            <img src="{{ asset('storage/' . $pregunta->imagen_explicacion) }}"
+                                 alt="Explicación"
+                                 class="mt-3 rounded-xl max-h-64 object-contain w-full">
+                        @endif
+                    @else
+                        <div class="flex items-center gap-3 mb-3">
+                            <span id="resultado-emoji" class="text-2xl"></span>
+                            <span id="resultado-titulo" class="font-bold text-lg"></span>
+                        </div>
+                        <p id="resultado-respuesta" class="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2"></p>
+                        <p id="resultado-explicacion" class="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed"></p>
+                        <img id="resultado-imagen" src="" alt="Explicación"
+                             class="hidden mt-3 rounded-xl max-h-64 object-contain w-full">
+                    @endif
+                </div>
             </div>
+        </div>
+
+        {{-- Navegación --}}
+        <div class="flex items-center justify-between gap-3">
+            @if($anterior)
+                <a href="{{ route('preguntas.show', [$conjunto, $anterior]) }}"
+                   class="flex items-center gap-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold px-5 py-2.5 rounded-2xl shadow hover:shadow-md transition-all text-sm"
+                   wire:navigate>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    </svg>
+                    Anterior
+                </a>
+            @else
+                <div></div>
+            @endif
+
+            @if($siguiente)
+                <a href="{{ route('preguntas.show', [$conjunto, $siguiente]) }}"
+                   class="flex items-center gap-2 bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-white font-semibold px-5 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all text-sm"
+                   wire:navigate>
+                    Siguiente
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            @else
+                @if(!$sesion?->estaTerminada())
+                    <form method="POST" action="{{ route('conjuntos.finalizar', $conjunto) }}">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit"
+                                class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-2xl shadow-lg transition-colors text-sm cursor-pointer">
+                            Finalizar conjunto
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </button>
+                    </form>
+                @else
+                    <a href="{{ route('conjuntos.resultados', $conjunto) }}"
+                       class="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 rounded-2xl shadow-lg transition-colors text-sm"
+                       wire:navigate>
+                        Ver resultados
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                @endif
+            @endif
         </div>
     </div>
 
+    {{-- SortableJS global (solo si el tipo lo necesita) --}}
+    @if(in_array($pregunta->tipo_interaccion, ['ordenar', 'completar']))
+        <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    @endif
+
     @if(!empty($pregunta->tipo_interaccion))
-        @php $tipoScript = 'preguntas.scripts.' . $pregunta->tipo_interaccion; @endphp
-        @if(view()->exists($tipoScript))
-            @include($tipoScript, ['config' => $pregunta->configuracion, 'progresoUsuario' => $progresoUsuario ?? null])
-        @endif
+        @include('preguntas.scripts.' . $pregunta->tipo_interaccion)
     @endif
 
     <script>
-        window._bebrasResp = {{ $yaRespondio ? 'true' : 'false' }};
-        window._bebrasPregId = {{ $pregunta->id }};
-        window._bebrasYaResp = {{ $yaRespondio ? 'true' : 'false' }};
+        window._bebrasResp = {{ $progreso ? 'true' : 'false' }};
 
-        function escapeHtml(str) {
-            if (str == null || str === undefined) return '';
-            const div = document.createElement('div');
-            div.textContent = String(str);
-            return div.innerHTML;
-        }
+        window.verificarRespuesta = async function() {
+            if (window._bebrasResp) return;
 
-        @if($yaRespondio)
-        document.addEventListener('DOMContentLoaded', function() {
-            const btnVerificar = document.getElementById('btnVerificar');
-            btnVerificar.disabled = true;
-            btnVerificar.classList.add('opacity-50', 'cursor-not-allowed');
-            btnVerificar.innerHTML = '<span>Ya Respondiste Esta Pregunta</span>';
-            deshabilitarInteraccion();
-            mostrarResultadoPrevio({
-                correcta: {{ $progresoUsuario->es_correcta ? 'true' : 'false' }},
-                explicacion: @json($pregunta->explicacion),
-                respuesta_correcta_visual: '',
-                imagen_respuesta: @json($pregunta->imagen_respuesta)
-            });
-            mostrarNavegacion();
-        });
-        function mostrarResultadoPrevio(data) {
-            const resultado = document.getElementById('resultado');
-            resultado.classList.remove('hidden');
-            if (data.correcta) {
-                resultado.className = 'mt-4 p-4 rounded-2xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600';
-                resultado.innerHTML = '<div class="flex items-start gap-2"><svg class="w-8 h-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><div class="flex-1"><h4 class="font-bold text-green-800 dark:text-green-200 text-lg mb-2">¡Respondiste Correctamente! 🎉</h4><p class="text-sm text-green-700 dark:text-green-300 leading-snug mb-2">' + escapeHtml(data.explicacion) + '</p>' + (data.imagen_respuesta ? '<div class="mt-2 flex justify-center"><img src="/storage/' + escapeHtml(data.imagen_respuesta) + '" alt="Solución" class="max-w-full max-h-48 rounded-xl shadow-md object-contain"></div>' : '') + '</div></div>';
-            } else {
-                resultado.className = 'mt-4 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-600';
-                resultado.innerHTML = '<div class="flex items-start gap-2"><svg class="w-8 h-8 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><div class="flex-1"><h4 class="font-bold text-red-800 dark:text-red-200 text-lg mb-2">Tu respuesta fue incorrecta</h4><p class="text-sm text-red-700 dark:text-red-300 leading-snug mb-2">' + escapeHtml(data.explicacion) + '</p>' + (data.imagen_respuesta ? '<div class="mt-2 flex justify-center"><img src="/storage/' + escapeHtml(data.imagen_respuesta) + '" alt="Solución" class="max-w-full max-h-48 rounded-xl shadow-md object-contain"></div>' : '') + '</div></div>';
-            }
-        }
-        @endif
+            const VERIFICAR_URL = "{{ route('preguntas.verificar', [$conjunto, $pregunta]) }}";
+            const CSRF_TOKEN    = "{{ csrf_token() }}";
+            const respuesta     = typeof obtenerRespuesta === 'function' ? obtenerRespuesta() : null;
 
-        function verificarRespuesta() {
-            const btnVerificar = document.getElementById('btnVerificar');
-            if (window._bebrasResp || window._bebrasYaResp) {
-                btnVerificar.disabled = true;
-                return; // No mostrar alert en móvil (evita modal intrusivo por doble toque)
-            }
-            const respuesta = obtenerRespuesta();
-            if (!respuesta) {
-                const msg = (typeof getMensajeIncompleto === 'function') ? getMensajeIncompleto() : 'Por favor completa tu respuesta antes de verificar';
+            if (respuesta === null || respuesta === undefined) {
+                // Intentar mensaje específico del tipo antes del alert genérico
+                const msg = typeof getMensajeIncompleto === 'function'
+                    ? getMensajeIncompleto()
+                    : 'Selecciona una respuesta antes de continuar.';
                 alert(msg);
                 return;
             }
-            btnVerificar.disabled = true;
-            btnVerificar.classList.add('opacity-50', 'cursor-not-allowed');
-            btnVerificar.innerHTML = '<span>Verificando...</span>';
-            fetch('/preguntas/' + window._bebrasPregId + '/verificar', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-                body: JSON.stringify({ respuesta })
-            })
-            .then(r => r.json())
-            .then(data => { window._bebrasResp = true; mostrarResultado(data); deshabilitarInteraccion(); mostrarNavegacion(); })
-            .catch(e => { console.error(e); alert('Hubo un error al verificar la respuesta'); });
-        }
 
-        function mostrarResultado(data) {
-            const resultado = document.getElementById('resultado');
-            const btnVerificar = document.getElementById('btnVerificar');
-            resultado.classList.remove('hidden');
-            btnVerificar.disabled = true;
-            btnVerificar.classList.add('opacity-50', 'cursor-not-allowed');
-            if (data.correcta) {
-                resultado.className = 'mt-4 p-4 rounded-2xl bg-green-50 dark:bg-green-900/20 border-2 border-green-500 dark:border-green-600';
-                resultado.innerHTML = '<div class="flex items-start gap-2"><svg class="w-8 h-8 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><div class="flex-1"><h4 class="font-bold text-green-800 dark:text-green-200 text-lg mb-2">¡Correcto!</h4><p class="text-sm text-green-700 dark:text-green-300 leading-snug mb-2">' + escapeHtml(data.explicacion) + '</p>' + (data.imagen_respuesta ? '<div class="mt-4 flex justify-center"><img src="/storage/' + escapeHtml(data.imagen_respuesta) + '" alt="Solución" class="max-w-full rounded-xl shadow-md"></div>' : '') + '</div></div>';
-            } else {
-                resultado.className = 'mt-4 p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-600';
-                resultado.innerHTML = '<div class="flex items-start gap-2"><svg class="w-8 h-8 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><div class="flex-1"><h4 class="font-bold text-red-800 dark:text-red-200 text-lg mb-2">Incorrecto</h4><p class="text-sm text-red-700 dark:text-red-300 leading-snug mb-2">' + escapeHtml(data.explicacion) + '</p>' + (data.imagen_respuesta ? '<div class="mt-4 flex justify-center"><img src="/storage/' + escapeHtml(data.imagen_respuesta) + '" alt="Solución" class="max-w-full rounded-xl shadow-md"></div>' : '') + (data.respuesta_correcta_visual ? '<div class="mt-4 p-4 bg-white dark:bg-neutral-800 rounded-xl border border-red-200 dark:border-red-800"><p class="font-semibold text-red-800 dark:text-red-200 mb-2">Respuesta correcta:</p><p class="text-red-700 dark:text-red-300">' + escapeHtml(data.respuesta_correcta_visual) + '</p></div>' : '') + '</div></div>';
+            const btn = document.getElementById('btn-verificar');
+            if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
+
+            try {
+                const res  = await fetch(VERIFICAR_URL, {
+                    method : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN' : CSRF_TOKEN,
+                        'Accept'       : 'application/json',
+                    },
+                    body: JSON.stringify({ respuesta }),
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    alert(data.mensaje ?? 'Ocurrió un error.');
+                    if (btn) { btn.disabled = false; btn.textContent = 'Verificar respuesta'; }
+                    return;
+                }
+
+                window._bebrasResp = true;
+                if (typeof deshabilitarInteraccion === 'function') deshabilitarInteraccion();
+                if (btn) btn.classList.add('hidden');
+
+                const panel    = document.getElementById('panel-resultado');
+                const emoji    = document.getElementById('resultado-emoji');
+                const titEl    = document.getElementById('resultado-titulo');
+                const respVis  = document.getElementById('resultado-respuesta');
+                const explicEl = document.getElementById('resultado-explicacion');
+                const imgEl    = document.getElementById('resultado-imagen');
+                const cont     = document.getElementById('resultado-contenido');
+
+                panel.classList.remove('hidden');
+
+                if (data.correcta) {
+                    cont.className  = 'rounded-2xl p-5 border bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
+                    emoji.textContent = '✅';
+                    titEl.textContent = '¡Correcto!';
+                    titEl.className   = 'font-bold text-green-700 dark:text-green-300 text-lg';
+                } else {
+                    cont.className  = 'rounded-2xl p-5 border bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+                    emoji.textContent = '❌';
+                    titEl.textContent = 'Incorrecto';
+                    titEl.className   = 'font-bold text-red-700 dark:text-red-300 text-lg';
+                }
+
+                if (respVis  && data.respuesta_correcta_visual) respVis.textContent  = data.respuesta_correcta_visual;
+                if (explicEl && data.explicacion)               explicEl.textContent = data.explicacion;
+                if (imgEl    && data.imagen_explicacion) {
+                    imgEl.src = '/storage/' + data.imagen_explicacion;
+                    imgEl.classList.remove('hidden');
+                }
+
+            } catch (e) {
+                alert('Error de conexión. Intenta de nuevo.');
+                if (btn) { btn.disabled = false; btn.textContent = 'Verificar respuesta'; }
             }
-            resultado.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
-
-        function mostrarNavegacion() {
-            const navegacion = document.getElementById('navegacion');
-            navegacion.classList.remove('hidden');
-            setTimeout(() => navegacion.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 300);
-        }
+        };
     </script>
 </x-layouts.app>

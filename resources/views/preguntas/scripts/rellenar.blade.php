@@ -135,8 +135,8 @@
     }
 
     // Inicializar: si ya hay respuestas previas, cargarlas
-    @if(isset($progresoUsuario) && $progresoUsuario && $progresoUsuario->respuesta_usuario)
-        const respuestaPrevia = @json($progresoUsuario->respuesta_usuario);
+    @if(isset($progreso) && $progreso && $progreso->respuesta_usuario)
+        const respuestaPrevia = @json($progreso->respuesta_usuario);
         if (respuestaPrevia && Array.isArray(respuestaPrevia)) {
             respuestaPrevia.forEach(item => {
                 if (item.area && item.color) {

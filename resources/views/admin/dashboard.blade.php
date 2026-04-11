@@ -2,14 +2,43 @@
     <div class="flex flex-col gap-6 p-4 lg:p-6">
 
         {{-- Header dentro del layout principal --}}
-        <div
-            class="bg-white/95 dark:bg-neutral-900/90 border border-yellow-300/70 rounded-3xl shadow-xl px-6 py-5">
-            <h1 class="text-2xl md:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
-                Panel de Administración
-            </h1>
-            <p class="text-sm md:text-base text-neutral-600 dark:text-neutral-300 font-medium mt-1">
-                Bebras Lab - Primavera 2025
-            </p>
+        <div class="bg-white/95 dark:bg-neutral-900/90 border border-yellow-300/70 rounded-3xl shadow-xl px-6 py-5 flex justify-between items-center flex-wrap gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-neutral-900 dark:text-white tracking-tight">
+                    Panel de Administración
+                </h1>
+                <p class="text-sm md:text-base text-neutral-600 dark:text-neutral-300 font-medium mt-1">
+                    Gestión de Tareas, Alumnos y Recursos
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <a href="{{ route('admin.pdfs.index') }}" class="px-4 py-2 bg-neutral-800 text-white text-sm font-bold rounded-xl hover:bg-neutral-700 transition-colors">
+                    Gestionar PDFs
+                </a>
+                <a href="{{ route('admin.conjuntos.create') }}" class="px-4 py-2 bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all">
+                    + Nuevo Conjunto
+                </a>
+            </div>
+        </div>
+
+        {{-- Tarjetas de Estadísticas --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-5">
+                <div class="text-sm font-medium text-neutral-500 dark:text-neutral-400">Alumnos Registrados</div>
+                <div class="text-3xl font-bold text-neutral-900 dark:text-white mt-1">{{ $totalAlumnos }}</div>
+            </div>
+            <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-5">
+                <div class="text-sm font-medium text-neutral-500 dark:text-neutral-400">Conjuntos</div>
+                <div class="text-3xl font-bold text-pink-600 dark:text-pink-400 mt-1">{{ $totalConjuntos }}</div>
+            </div>
+            <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-5">
+                <div class="text-sm font-medium text-neutral-500 dark:text-neutral-400">PDFs Subidos</div>
+                <div class="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">{{ $totalPdfs }}</div>
+            </div>
+            <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-5">
+                <div class="text-sm font-medium text-neutral-500 dark:text-neutral-400">Respuestas Totales</div>
+                <div class="text-3xl font-bold text-purple-600 dark:text-purple-400 mt-1">{{ $totalRespuestas }}</div>
+            </div>
         </div>
 
         {{-- Contenedor principal con tabs y contenido en tarjeta --}}
@@ -24,9 +53,9 @@
                             class="tab-button border-b-2 border-pink-500 py-3 px-1 text-sm font-semibold text-pink-600">
                             Alumnos ({{ $alumnos->count() }})
                         </button>
-                        <button onclick="mostrarTab('preguntas')" id="tab-preguntas"
+                        <button onclick="mostrarTab('conjuntos')" id="tab-conjuntos"
                             class="tab-button border-b-2 border-transparent py-3 px-1 text-sm font-semibold text-neutral-500 hover:text-neutral-800 hover:border-neutral-300 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:border-neutral-500">
-                            Gestionar Preguntas ({{ $preguntas->count() }})
+                            Gestionar Conjuntos ({{ $conjuntos->count() }})
                         </button>
                     </nav>
                 </div>
@@ -97,7 +126,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-center">
                                         <span
                                             class="inline-flex items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 px-3 py-1 text-xs font-semibold text-neutral-800 dark:text-neutral-100">
-                                            {{ $total }}/27
+                                            {{ $total }}/{{ $totalPreguntasSistema }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-center">
@@ -126,7 +155,7 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                        <a href="{{ route('admin.progreso', $alumno->id) }}"
+                                        <a href="{{ route('admin.alumnos.progreso', $alumno->id) }}"
                                             class="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-200 dark:hover:bg-blue-900/70 transition-colors">
                                             Ver Detalle
                                         </a>
@@ -139,53 +168,48 @@
             </div>
         </div>
 
-            {{-- Tab de Preguntas --}}
-            <div id="content-preguntas" class="tab-content hidden">
+            {{-- Tab de Conjuntos --}}
+            <div id="content-conjuntos" class="tab-content hidden">
                 <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    @foreach ($preguntas as $pregunta)
-                        <div
-                            class="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-5 transition-all {{ !$pregunta->activa ? 'opacity-60' : '' }}">
+                    @foreach ($conjuntos as $conjunto)
+                        <div class="relative bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-5 transition-all {{ !$conjunto->activo ? 'opacity-60' : '' }}">
+                            
                             {{-- Toggle Switch --}}
                             <div class="absolute top-4 right-4">
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" class="sr-only peer" {{ $pregunta->activa ? 'checked' : '' }}
-                                        onchange="togglePregunta({{ $pregunta->id }}, this)">
-                                    <div
-                                        class="w-11 h-6 bg-neutral-200 dark:bg-neutral-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-pink-300/60 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500">
-                                    </div>
-                                </label>
+                                <form action="{{ route('admin.conjuntos.toggle', $conjunto) }}" method="POST">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="relative inline-flex items-center cursor-pointer focus:outline-none">
+                                        <div class="w-11 h-6 rounded-full transition-all border border-neutral-300 dark:border-neutral-600 {{ $conjunto->activo ? 'bg-gradient-to-r from-yellow-400 via-pink-400 to-purple-500' : 'bg-neutral-200 dark:bg-neutral-700' }}"></div>
+                                        <div class="absolute left-[2px] top-[2px] bg-white border border-neutral-300 rounded-full h-5 w-5 transition-all {{ $conjunto->activo ? 'translate-x-full border-white' : '' }}"></div>
+                                    </button>
+                                </form>
                             </div>
 
-                            <h3 class="text-base font-bold text-neutral-900 dark:text-neutral-50 mb-2 pr-16">
-                                {{ $pregunta->numero }}. {{ $pregunta->titulo }}
+                            <h3 class="text-lg font-bold text-neutral-900 dark:text-neutral-50 mb-2 pr-16 line-clamp-1">
+                                {{ $conjunto->nombre }}
                             </h3>
 
                             <div class="flex flex-wrap gap-2 mb-3">
-                                <span
-                                    class="px-2 py-1 bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 rounded-full text-[11px] font-semibold">
-                                    Nivel {{ $pregunta->nivel }}
+                                <span class="px-2 py-1 bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 rounded-full text-[11px] font-semibold">
+                                    {{ $conjunto->preguntas_count }} Preguntas
                                 </span>
-                                <span
-                                    class="px-2 py-1 rounded-full text-[11px] font-semibold
-                                        {{ $pregunta->dificultad === 'Baja' ? 'bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-200' : '' }}
-                                        {{ $pregunta->dificultad === 'Media' ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200' : '' }}
-                                        {{ $pregunta->dificultad === 'Alta' ? 'bg-red-50 text-red-700 dark:bg-red-900/40 dark:text-red-200' : '' }}">
-                                    {{ $pregunta->dificultad }}
+                                <span class="px-2 py-1 bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200 rounded-full text-[11px] font-semibold">
+                                    {{ $conjunto->sesiones_count }} Sesiones
                                 </span>
                             </div>
 
-                            <p class="text-sm text-neutral-600 dark:text-neutral-300 line-clamp-2 mb-4">
-                                {{ $pregunta->descripcion }}
+                            <p class="text-sm text-neutral-600 dark:text-neutral-300 line-clamp-2 mb-4 h-10">
+                                {{ $conjunto->descripcion ?? 'Sin descripción.' }}
                             </p>
 
-                            <div class="flex items-center justify-between text-xs md:text-sm">
-                                <span class="text-neutral-500 dark:text-neutral-400">
-                                    {{ $pregunta->pais_origen }}
-                                </span>
-                                <span
-                                    class="font-semibold {{ $pregunta->activa ? 'text-green-600 dark:text-green-300' : 'text-red-600 dark:text-red-300' }}">
-                                    {{ $pregunta->activa ? 'Activa' : 'Desactivada' }}
-                                </span>
+                            <div class="flex gap-2 mt-4 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+                                <a href="{{ route('admin.conjuntos.show', $conjunto) }}" class="flex-1 text-center py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-xl text-sm font-semibold transition-colors">
+                                    Gestionar
+                                </a>
+                                <a href="{{ route('admin.conjuntos.edit', $conjunto) }}" class="flex-1 text-center py-2 bg-pink-50 hover:bg-pink-100 dark:bg-pink-900/20 dark:hover:bg-pink-900/40 text-pink-700 dark:text-pink-300 rounded-xl text-sm font-semibold transition-colors">
+                                    Editar
+                                </a>
                             </div>
                         </div>
                     @endforeach
@@ -240,3 +264,4 @@
         }
     </script>
 </x-layouts.app>
+

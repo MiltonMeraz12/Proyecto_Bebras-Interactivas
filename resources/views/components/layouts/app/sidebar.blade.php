@@ -11,7 +11,7 @@
         @if($user && $user->isAlumno())
             {{-- Layout para alumnos: sin sidebar, solo header superior --}}
             <flux:header class="border-b border-zinc-200 bg-white/90 dark:border-zinc-700 dark:bg-zinc-900/90 backdrop-blur">
-                <a href="{{ route('preguntas.index') }}" class="flex items-center gap-2" wire:navigate>
+                <a href="{{ route('conjuntos.index') }}" class="flex items-center gap-2" wire:navigate>
                     <x-app-logo />
                     <span class="font-semibold text-sm text-neutral-900 dark:text-white">
                         Bebras Lab
@@ -100,7 +100,7 @@
                 <flux:navlist variant="outline">
                     <flux:navlist.group :heading="__('Platform')" class="grid">
                         <flux:navlist.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>{{ __('Dashboard') }}</flux:navlist.item>
-                        <flux:navlist.item icon="book-open" :href="route('preguntas.index')" :current="request()->routeIs('preguntas.*')" wire:navigate>{{ __('Biblioteca de Preguntas') }}</flux:navlist.item>
+                        <flux:navlist.item icon="book-open" :href="route('conjuntos.index')" :current="request()->routeIs('conjuntos.*')" wire:navigate>{{ __('Biblioteca de Conjuntos') }}</flux:navlist.item>
                     </flux:navlist.group>
                 </flux:navlist>
 

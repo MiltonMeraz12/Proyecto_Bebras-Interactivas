@@ -1,31 +1,36 @@
+@php
+    $config   = is_array($config ?? null) ? $config : [];
+    $elementos = $config['elementos'] ?? array_map(fn($o) => [
+        'id'     => $o['id'],
+        'nombre' => $o['valor'] ?? $o['nombre'] ?? $o['id'],
+    ], $config['opciones'] ?? []);
 
-<div class="grid md:grid-cols-2 gap-3">
-    @php
-        $config = $pregunta->configuracion;
-        // Aceptar 'elementos' o 'opciones' (mapear valor -> nombre)
-        $elementos = $config['elementos'] ?? array_map(function ($o) {
-            return ['id' => $o['id'], 'nombre' => $o['valor'] ?? $o['nombre'] ?? $o['id']];
-        }, $config['opciones'] ?? []);
-        $elementosMezclados = $elementos;
-        shuffle($elementosMezclados);
-    @endphp
-    
-    {{-- Elementos desordenados --}}
+    $mezclados = $elementos;
+    shuffle($mezclados);
+@endphp
+
+<div class="grid md:grid-cols-2 gap-4">
+    {{-- Disponibles --}}
     <div>
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">
-            Disponibles: 
-            <span class="text-xs font-normal text-gray-500" id="contador-fuente">
-                ({{ count($elementosMezclados) }})
-            </span>
+        <h4 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
+            Disponibles
+            <span class="text-xs font-normal text-neutral-400" id="contador-fuente">({{ count($mezclados) }})</span>
         </h4>
-        <div id="elementos-fuente" class="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-2 min-h-[150px] max-h-[300px] overflow-y-auto">
-            @foreach($elementosMezclados as $elemento)
-                <div class="elemento-draggable bg-white border-2 border-gray-300 rounded-lg p-2 mb-1 cursor-move hover:shadow-lg transition-shadow touch-manipulation"
-                     data-id="{{ $elemento['id'] }}">
-                    @if(isset($elemento['imagen']))
-                        <img src="{{ asset('storage/' . $elemento['imagen']) }}" alt="{{ $elemento['id'] }}" class="full w-auto h-12 object-contain">
+        <div id="elementos-fuente"
+             class="bg-neutral-100 dark:bg-neutral-800/50 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-2xl p-2 min-h-[160px] max-h-[320px] overflow-y-auto space-y-1">
+            @foreach($mezclados as $el)
+                <div class="elemento-draggable bg-white dark:bg-neutral-800 border-2 border-neutral-300 dark:border-neutral-600
+                             rounded-xl p-3 cursor-move hover:shadow-md hover:border-pink-300 dark:hover:border-pink-600
+                             transition-all touch-manipulation"
+                     data-id="{{ $el['id'] }}">
+                    @if(isset($el['imagen']))
+                        <img src="{{ asset('storage/' . $el['imagen']) }}"
+                             alt="{{ $el['id'] }}"
+                             class="w-full h-14 object-contain rounded-lg">
                     @else
-                        <span class="text-sm font-medium">{{ $elemento['nombre'] ?? $elemento['id'] }}</span>
+                        <span class="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+                            {{ $el['nombre'] ?? $el['id'] }}
+                        </span>
                     @endif
                 </div>
             @endforeach
@@ -34,16 +39,17 @@
 
     {{-- Área de ordenamiento --}}
     <div>
-        <h4 class="text-sm font-semibold text-gray-700 mb-2">
-            Orden correcto: 
-            <span class="text-xs font-normal text-gray-500" id="contador-destino">(0)</span>
+        <h4 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2 flex items-center gap-2">
+            Orden correcto
+            <span class="text-xs font-normal text-neutral-400" id="contador-destino">(0)</span>
         </h4>
-        <div id="area-ordenamiento" class="bg-blue-50 border-2 border-dashed border-blue-300 rounded-lg p-2 min-h-[150px] max-h-[300px] overflow-y-auto">
-            <p class="text-xs text-gray-400 text-center py-4" id="placeholder-orden">Arrastra los elementos aquí</p>
+        <div id="area-ordenamiento"
+             class="bg-pink-50 dark:bg-pink-900/10 border-2 border-dashed border-pink-300 dark:border-pink-700 rounded-2xl p-2 min-h-[160px] max-h-[320px] overflow-y-auto">
+            <p class="text-xs text-neutral-400 text-center py-6" id="placeholder-orden">
+                Arrastra los elementos aquí en orden
+            </p>
         </div>
     </div>
 </div>
 
-@if(isset($pregunta->configuracion['mostrar_numeros']) && $pregunta->configuracion['mostrar_numeros'])
-    <p class="text-sm text-gray-600 mt-3">Pista: Puedes ponerles números del 1 al {{ count($elementos) }}</p>
-@endif
+{{-- SortableJS se carga desde el script --}}

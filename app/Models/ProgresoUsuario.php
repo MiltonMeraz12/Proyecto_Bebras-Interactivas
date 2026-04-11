@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProgresoUsuario extends Model
 {
@@ -16,14 +17,21 @@ class ProgresoUsuario extends Model
         'respuesta_usuario' => 'array',
         'es_correcta' => 'boolean',
         'completada_at' => 'datetime',
+        'intentos' => 'integer',
     ];
 
-    public function user()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\User, $this>
+     */
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function pregunta()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Pregunta, $this>
+     */
+    public function pregunta(): BelongsTo
     {
         return $this->belongsTo(Pregunta::class);
     }

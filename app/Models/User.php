@@ -8,61 +8,27 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role', // Agregar
+        'role',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
-
-
-    // Relaciones
-    public function progresos()
-    {
-        return $this->hasMany(ProgresoUsuario::class);
-    }
-
-    // Métodos helper
-    public function isAdmin()
-    {
-        return $this->role === 'admin';
-    }
-
-    public function isAlumno()
-    {
-        return $this->role === 'alumno';
-    }
-
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
-
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
@@ -70,9 +36,54 @@ class User extends Authenticatable
         ];
     }
 
+    // Helpers
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isAlumno(): bool
+    {
+        return $this->role === 'alumno';
+    }
+
+
+
+    // Relaciones
     /**
-     * Get the user's initials
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\ProgresoUsuario, $this>
      */
+    public function progresos(): HasMany
+    {
+        return $this->hasMany(ProgresoUsuario::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\SesionConjunto, $this>
+     */
+    public function sesionesConjunto(): HasMany
+    {
+        return $this->hasMany(SesionConjunto::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\ArchivoPdf, $this>
+     */
+    public function pdfsSubidos(): HasMany
+    {
+        return $this->hasMany(ArchivoPdf::class, 'subido_por');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Conjunto, $this>
+     */
+    public function conjuntosCreados(): HasMany
+    {
+        return $this->hasMany(Conjunto::class, 'creado_por');
+    }
+
+
+    // Utilidades?
     public function initials(): string
     {
         return Str::of($this->name)

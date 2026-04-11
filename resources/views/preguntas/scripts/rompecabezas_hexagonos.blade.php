@@ -1,452 +1,195 @@
 <script>
-    let colocaciones = {}; // { "fila-columna": {id, color, rotacion, imagen?} }
-    const config = @json($config ?? []);
-    const piezasDisponibles = config.piezas_disponibles || [];
-    const estructura = config.estructura || [];
-    const colores = config.colores || ['red', 'blue', 'green'];
+    let piezasColocadas = {}; // { "fila-columna": { piezaId, color } }
+    const configRP = @json($config ?? []);
+    const piezasDisponibles = configRP.piezas_disponibles || [];
+    const estructuraRP = configRP.estructura || [];
 
-    // Inicializar drag and drop
     document.addEventListener('DOMContentLoaded', function() {
-        inicializarDragAndDrop();
-        actualizarResumen();
+        inicializarRompecabezas();
     });
 
-    function inicializarDragAndDrop() {
-        const piezasDisponiblesEl = document.getElementById('piezas-disponibles');
-        const celdasRompecabezas = document.querySelectorAll('.celda-hexagono[data-fija="false"]');
+    function inicializarRompecabezas() {
         const esTactil = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        const celdasRP  = document.querySelectorAll('.celda-hexagono[data-fija="false"]');
 
-        // Drag-and-drop solo en dispositivos con mouse
         if (!esTactil) {
-            piezasDisponiblesEl.querySelectorAll('.pieza-item').forEach(pieza => {
-                pieza.addEventListener('dragstart', function(e) {
-                    e.dataTransfer.setData('text/plain', JSON.stringify({
-                        id: this.dataset.piezaId,
-                        color: this.dataset.color,
-                        imagen: this.dataset.imagen || ''
-                    }));
-                    this.classList.add('dragging');
+            // Drag & drop en escritorio
+            document.querySelectorAll('.pieza-item').forEach(pieza => {
+                pieza.addEventListener('dragstart', e => {
+                    e.dataTransfer.setData('text/plain', pieza.dataset.piezaId);
+                    pieza.classList.add('dragging');
                 });
-
-                pieza.addEventListener('dragend', function(e) {
-                    this.classList.remove('dragging');
-                    document.querySelectorAll('.celda-hexagono').forEach(celda => {
-                        celda.classList.remove('drag-over');
-                    });
-                });
+                pieza.addEventListener('dragend', () => pieza.classList.remove('dragging'));
             });
 
-            celdasRompecabezas.forEach(celda => {
-                celda.addEventListener('dragover', function(e) {
+            celdasRP.forEach(celda => {
+                celda.addEventListener('dragover', e => { e.preventDefault(); celda.classList.add('drag-over'); });
+                celda.addEventListener('dragleave', ()  => celda.classList.remove('drag-over'));
+                celda.addEventListener('drop', e => {
                     e.preventDefault();
-                    if (!this.classList.contains('ocupada') && this.dataset.fija !== 'true') {
-                        this.classList.add('drag-over');
-                    }
+                    celda.classList.remove('drag-over');
+                    const piezaId = e.dataTransfer.getData('text/plain');
+                    if (!piezaId || celda.dataset.ocupada === 'true') return;
+                    colocarPiezaEnCelda(celda, piezaId);
                 });
-
-                celda.addEventListener('dragleave', function(e) {
-                    this.classList.remove('drag-over');
-                });
-
-                celda.addEventListener('drop', function(e) {
-                    e.preventDefault();
-                    this.classList.remove('drag-over');
-                    const piezaData = JSON.parse(e.dataTransfer.getData('text/plain'));
-                    if (!piezaData || !piezaData.id) return;
-                    if (this.classList.contains('ocupada')) {
-                        mostrarMensaje('Esta celda ya está ocupada. Remueve la pieza primero.', 'warning');
-                        return;
-                    }
-                    const fila = parseInt(this.dataset.fila);
-                    const columna = parseInt(this.dataset.columna);
-                    if (!validarTriangulo(fila, columna, piezaData.color)) {
-                        mostrarMensaje('Esta colocación no cumple la regla del triángulo. Todas las piezas deben ser del mismo color O todas de colores diferentes.', 'warning');
-                        return;
-                    }
-                    const celdaAnterior = encontrarCeldaConPieza(piezaData.id);
-                    if (celdaAnterior) removerPiezaDeCelda(celdaAnterior);
-                    colocarPiezaEnCelda(this, piezaData);
-                });
-
-                // Doble clic para remover (escritorio)
-                celda.addEventListener('dblclick', function(e) {
-                    if (this.classList.contains('ocupada')) removerPiezaDeCelda(this);
-                });
-
-                // Click para rotar pieza ya colocada (escritorio)
-                celda.addEventListener('click', function(e) {
-                    if (this.classList.contains('ocupada') && this.dataset.fija !== 'true') {
-                        rotarPiezaEnCelda(this);
-                    }
+                celda.addEventListener('dblclick', () => {
+                    if (celda.dataset.ocupada === 'true') removerPiezaDeCelda(celda);
                 });
             });
-        }
+        } else {
+            // Modo táctil
+            window._piezaSeleccionadaRP = null;
+            const instrArr = document.querySelector('.instrucciones-arrastre-rp');
+            const instrToque = document.querySelector('.instrucciones-toque-rp');
+            if (instrArr)   instrArr.style.display   = 'none';
+            if (instrToque) instrToque.style.display = 'block';
 
-        // Soporte táctil: toca una pieza para seleccionarla, toca la celda para colocarla
-        // (iOS/iPadOS no soporta la API HTML5 de drag-and-drop)
-        if (esTactil) {
-            window._piezaSeleccionadaToque = null;
-
-            // Mostrar instrucciones táctiles
-            const instrucciones = document.querySelector('.instrucciones-arrastre-rp');
-            const instruccionesToque = document.querySelector('.instrucciones-toque-rp');
-            if (instrucciones) instrucciones.style.display = 'none';
-            if (instruccionesToque) instruccionesToque.style.display = 'block';
-
-            piezasDisponiblesEl.querySelectorAll('.pieza-item').forEach(pieza => {
-                pieza.addEventListener('touchend', function(e) {
+            document.querySelectorAll('.pieza-item').forEach(pieza => {
+                pieza.addEventListener('touchend', e => {
                     e.preventDefault();
-                    if (this.style.display === 'none') return;
-                    const id = this.dataset.piezaId;
-                    if (window._piezaSeleccionadaToque === id) {
-                        window._piezaSeleccionadaToque = null;
-                        this.classList.remove('pieza-toque-activa');
+                    if (pieza.style.display === 'none') return;
+                    const id = pieza.dataset.piezaId;
+                    if (window._piezaSeleccionadaRP === id) {
+                        window._piezaSeleccionadaRP = null;
+                        pieza.classList.remove('pieza-toque-activa');
                     } else {
-                        document.querySelectorAll('.pieza-item.pieza-toque-activa').forEach(el => el.classList.remove('pieza-toque-activa'));
-                        window._piezaSeleccionadaToque = id;
-                        this.classList.add('pieza-toque-activa');
-                        mostrarMensaje('Pieza ' + id + ' seleccionada. Toca una celda del rompecabezas para colocarla.', 'info');
+                        document.querySelectorAll('.pieza-item').forEach(p => p.classList.remove('pieza-toque-activa'));
+                        window._piezaSeleccionadaRP = id;
+                        pieza.classList.add('pieza-toque-activa');
                     }
                 });
             });
 
-            celdasRompecabezas.forEach(celda => {
-                celda.addEventListener('touchend', function(e) {
+            celdasRP.forEach(celda => {
+                celda.addEventListener('touchend', e => {
                     e.preventDefault();
-                    if (window._piezaSeleccionadaToque) {
-                        const id = window._piezaSeleccionadaToque;
-                        if (this.classList.contains('ocupada')) {
-                            // Tap en celda ocupada con pieza seleccionada → rotar
-                            if (this.dataset.fija !== 'true') rotarPiezaEnCelda(this);
-                            return;
-                        }
-                        const fila = parseInt(this.dataset.fila);
-                        const columna = parseInt(this.dataset.columna);
-                        const piezaEl = document.querySelector(`[data-pieza-id="${id}"]`);
-                        const color = piezaEl ? piezaEl.dataset.color : '';
-                        if (!validarTriangulo(fila, columna, color)) {
-                            mostrarMensaje('Esta colocación no cumple la regla del triángulo.', 'warning');
-                            return;
-                        }
-                        const anterior = encontrarCeldaConPieza(id);
-                        if (anterior) removerPiezaDeCelda(anterior);
-                        colocarPiezaEnCelda(this, {
-                            id: id,
-                            color: color,
-                            imagen: piezaEl ? (piezaEl.dataset.imagen || '') : ''
-                        });
-                        document.querySelectorAll('.pieza-item.pieza-toque-activa').forEach(el => el.classList.remove('pieza-toque-activa'));
-                        window._piezaSeleccionadaToque = null;
-                    } else if (this.classList.contains('ocupada') && this.dataset.fija !== 'true') {
-                        // Tap en celda ocupada sin selección → remover
-                        removerPiezaDeCelda(this);
+                    if (window._piezaSeleccionadaRP) {
+                        if (celda.dataset.ocupada === 'true') return;
+                        colocarPiezaEnCelda(celda, window._piezaSeleccionadaRP);
+                        document.querySelectorAll('.pieza-item').forEach(p => p.classList.remove('pieza-toque-activa'));
+                        window._piezaSeleccionadaRP = null;
+                    } else if (celda.dataset.ocupada === 'true') {
+                        removerPiezaDeCelda(celda);
                     }
                 });
             });
         }
     }
 
-    function rotarPiezaEnCelda(celda) {
-        const fila = parseInt(celda.dataset.fila);
-        const columna = parseInt(celda.dataset.columna);
-        const clave = `${fila}-${columna}`;
+    function colocarPiezaEnCelda(celda, piezaId) {
+        const pieza = piezasDisponibles.find(p => p.id === piezaId);
+        if (!pieza) return;
 
-        if (!colocaciones[clave]) {
-            return;
+        const fila    = celda.dataset.fila;
+        const columna = celda.dataset.columna;
+        const clave   = `${fila}-${columna}`;
+
+        celda.dataset.ocupada   = 'true';
+        celda.dataset.piezaId   = piezaId;
+        celda.style.backgroundColor = pieza.color;
+        celda.style.borderColor     = pieza.color;
+
+        const contenedor = celda.querySelector('.pieza-en-celda');
+        const span       = celda.querySelector('span');
+        if (span)      span.style.display = 'none';
+        if (contenedor) {
+            contenedor.classList.remove('hidden');
+            const img = contenedor.querySelector('.pieza-en-celda-imagen');
+            const lbl = contenedor.querySelector('span');
+            if (pieza.imagen && img) { img.src = `/storage/${pieza.imagen}`; img.classList.remove('hidden'); }
+            if (lbl) lbl.textContent = pieza.id;
         }
 
-        const rotacionActual = parseInt(celda.dataset.rotacion || '0');
-        const nuevaRotacion = (rotacionActual + 60) % 360; // rotar de 60 en 60 grados
-        celda.dataset.rotacion = nuevaRotacion;
+        piezasColocadas[clave] = { piezaId, color: pieza.color };
 
-        const contenedorPieza = celda.querySelector('.pieza-en-celda');
-        if (contenedorPieza) {
-            contenedorPieza.style.transform = `rotate(${nuevaRotacion}deg)`;
-        }
+        // Ocultar pieza de la lista
+        const piezaEl = document.querySelector(`.pieza-item[data-pieza-id="${piezaId}"]`);
+        if (piezaEl) piezaEl.style.display = 'none';
 
-        colocaciones[clave].rotacion = nuevaRotacion;
-    }
-
-    function validarTriangulo(fila, columna, colorNuevo) {
-        // La regla: el triángulo formado (pieza nueva + 2 de abajo) debe tener:
-        // - Todas del mismo color O
-        // - Todas de colores diferentes
-        
-        // Obtener las 2 piezas de abajo (fila + 1, columna y columna + 1)
-        const piezaAbajo1 = obtenerPiezaEnPosicion(fila + 1, columna);
-        const piezaAbajo2 = obtenerPiezaEnPosicion(fila + 1, columna + 1);
-        
-        // Si no hay 2 piezas de abajo, no se puede validar (pero se permite colocar)
-        if (!piezaAbajo1 || !piezaAbajo2) {
-            return true; // Se permite si no hay piezas de abajo aún
-        }
-        
-        const colores = [colorNuevo, piezaAbajo1.color, piezaAbajo2.color];
-        
-        // Verificar si todas son del mismo color
-        const todosIguales = colores.every(c => c === colores[0]);
-        
-        // Verificar si todas son de colores diferentes
-        const todosDiferentes = new Set(colores).size === 3;
-        
-        return todosIguales || todosDiferentes;
-    }
-
-    function obtenerPiezaEnPosicion(fila, columna) {
-        const clave = `${fila}-${columna}`;
-        if (colocaciones[clave]) {
-            return colocaciones[clave];
-        }
-        
-        // También verificar si hay una pieza fija en esa posición
-        const celda = document.querySelector(`.celda-hexagono[data-fila="${fila}"][data-columna="${columna}"][data-fija="true"]`);
-        if (celda) {
-            return {
-                id: celda.dataset.id || 'fija',
-                color: celda.dataset.color
-            };
-        }
-        
-        return null;
-    }
-
-    function colocarPiezaEnCelda(celda, piezaData) {
-        const fila = parseInt(celda.dataset.fila);
-        const columna = parseInt(celda.dataset.columna);
-        const clave = `${fila}-${columna}`;
-        const rotacion = piezaData.rotacion !== undefined ? piezaData.rotacion : 0;
-
-        // Marcar celda como ocupada
-        celda.classList.add('ocupada');
-        celda.dataset.ocupada = 'true';
-        celda.dataset.piezaId = piezaData.id;
-        celda.dataset.color = piezaData.color;
-        celda.dataset.rotacion = rotacion;
-
-        // Ocultar número de celda
-        const numeroCelda = celda.querySelector('span');
-        if (numeroCelda) {
-            numeroCelda.style.display = 'none';
-        }
-
-        // Mostrar pieza en la celda
-        const contenedorPieza = celda.querySelector('.pieza-en-celda');
-        if (contenedorPieza) {
-            const span = contenedorPieza.querySelector('span');
-            const img = contenedorPieza.querySelector('.pieza-en-celda-imagen');
-
-            if (piezaData.imagen) {
-                // Mostrar imagen de la pieza
-                contenedorPieza.style.backgroundColor = '';
-                contenedorPieza.style.borderColor = '';
-                if (img) {
-                    img.src = `/storage/${piezaData.imagen}`;
-                    img.alt = `Pieza ${piezaData.id}`;
-                    img.classList.remove('hidden');
-                }
-                if (span) {
-                    span.textContent = '';
-                }
-            } else {
-                // Mostrar pieza como hexágono de color con letra
-                contenedorPieza.style.backgroundColor = piezaData.color;
-                contenedorPieza.style.borderColor = piezaData.color;
-                if (img) {
-                    img.classList.add('hidden');
-                    img.removeAttribute('src');
-                }
-                if (span) {
-                    span.textContent = piezaData.id;
-                }
-            }
-
-            contenedorPieza.style.transform = `rotate(${rotacion}deg)`;
-            contenedorPieza.classList.remove('hidden');
-        }
-
-        // Guardar colocación
-        colocaciones[clave] = {
-            id: piezaData.id,
-            color: piezaData.color,
-            rotacion: rotacion,
-            imagen: piezaData.imagen || null
-        };
-
-        // Remover pieza de la lista de disponibles
-        removerPiezaDeLista(piezaData.id);
-
-        actualizarResumen();
-        actualizarContadores();
-        mostrarMensaje(`Pieza ${piezaData.id} colocada correctamente`, 'success');
+        actualizarContadoresRP();
     }
 
     function removerPiezaDeCelda(celda) {
-        const fila = parseInt(celda.dataset.fila);
-        const columna = parseInt(celda.dataset.columna);
-        const clave = `${fila}-${columna}`;
+        const fila    = celda.dataset.fila;
+        const columna = celda.dataset.columna;
+        const clave   = `${fila}-${columna}`;
         const piezaId = celda.dataset.piezaId;
 
-        if (!piezaId) return;
-
-        // Remover marca de ocupada
-        celda.classList.remove('ocupada');
-        celda.dataset.ocupada = 'false';
+        celda.dataset.ocupada       = 'false';
         delete celda.dataset.piezaId;
-        delete celda.dataset.color;
+        celda.style.backgroundColor = '';
+        celda.style.borderColor     = '';
 
-        // Mostrar número de celda
-        const numeroCelda = celda.querySelector('span');
-        if (numeroCelda) {
-            numeroCelda.style.display = 'block';
-        }
+        const contenedor = celda.querySelector('.pieza-en-celda');
+        const span       = celda.querySelector('span');
+        if (span)      span.style.display = '';
+        if (contenedor) contenedor.classList.add('hidden');
 
-        // Ocultar pieza
-        const contenedorPieza = celda.querySelector('.pieza-en-celda');
-        if (contenedorPieza) {
-            contenedorPieza.classList.add('hidden');
-        }
+        delete piezasColocadas[clave];
 
-        // Remover de colocaciones
-        delete colocaciones[clave];
+        const piezaEl = document.querySelector(`.pieza-item[data-pieza-id="${piezaId}"]`);
+        if (piezaEl) piezaEl.style.display = '';
 
-        // Regresar pieza a la lista de disponibles
-        regresarPiezaALista(piezaId);
-
-        actualizarResumen();
-        actualizarContadores();
-        mostrarMensaje(`Pieza ${piezaId} removida`, 'info');
+        actualizarContadoresRP();
     }
 
-    function removerPiezaDeLista(piezaId) {
-        const piezaItem = document.querySelector(`[data-pieza-id="${piezaId}"]`);
-        if (piezaItem) {
-            piezaItem.style.display = 'none';
-        }
-    }
+    function actualizarContadoresRP() {
+        const total    = document.querySelectorAll('.celda-hexagono[data-fija="false"]').length;
+        const colocadas= Object.keys(piezasColocadas).length;
+        const el = document.getElementById('contador-colocadas');
+        if (el) el.textContent = `(${colocadas}/${total} colocadas)`;
 
-    function regresarPiezaALista(piezaId) {
-        const piezaItem = document.querySelector(`[data-pieza-id="${piezaId}"]`);
-        if (piezaItem) {
-            piezaItem.style.display = 'block';
-        }
-    }
-
-    function encontrarCeldaConPieza(piezaId) {
-        return document.querySelector(`.celda-hexagono[data-pieza-id="${piezaId}"]`);
-    }
-
-    function actualizarResumen() {
         const resumen = document.getElementById('resumen-colocacion');
-        const colocadas = Object.keys(colocaciones).length;
-
-        if (colocadas === 0) {
-            resumen.innerHTML = '<p>Ninguna pieza colocada aún.</p>';
-        } else {
-            let html = '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">';
-            Object.entries(colocaciones).forEach(([posicion, pieza]) => {
-                html += `<div class="bg-white border border-gray-300 rounded p-1 text-xs">
-                    <span class="font-semibold">Pieza ${pieza.id}</span> → ${posicion}
-                </div>`;
-            });
-            html += '</div>';
-            resumen.innerHTML = html;
-        }
-    }
-
-    function actualizarContadores() {
-        const piezasColocadas = Object.keys(colocaciones).length;
-        const piezasDisponibles = piezasDisponibles.length - piezasColocadas;
-        const totalCeldas = document.querySelectorAll('.celda-hexagono[data-fija="false"]').length;
-
-        const contadorPiezas = document.getElementById('contador-piezas');
-        if (contadorPiezas) {
-            contadorPiezas.textContent = `(${piezasDisponibles})`;
-        }
-
-        const contadorColocadas = document.getElementById('contador-colocadas');
-        if (contadorColocadas) {
-            contadorColocadas.textContent = `(${piezasColocadas}/${totalCeldas} colocadas)`;
-        }
-    }
-
-    function mostrarMensaje(texto, tipo) {
-        let mensajeDiv = document.getElementById('mensaje-temporal');
-        if (!mensajeDiv) {
-            mensajeDiv = document.createElement('div');
-            mensajeDiv.id = 'mensaje-temporal';
-            mensajeDiv.className = 'fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm';
-            document.body.appendChild(mensajeDiv);
-        }
-
-        const colores = {
-            'info': 'bg-blue-100 text-blue-800 border-blue-300',
-            'success': 'bg-green-100 text-green-800 border-green-300',
-            'warning': 'bg-yellow-100 text-yellow-800 border-yellow-300'
-        };
-
-        mensajeDiv.className = `fixed top-20 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm border-2 ${colores[tipo] || colores.info}`;
-        mensajeDiv.textContent = texto;
-
-        setTimeout(() => {
-            if (mensajeDiv) {
-                mensajeDiv.style.opacity = '0';
-                mensajeDiv.style.transition = 'opacity 0.5s';
-                setTimeout(() => {
-                    if (mensajeDiv && mensajeDiv.parentNode) {
-                        mensajeDiv.parentNode.removeChild(mensajeDiv);
-                    }
-                }, 500);
-            }
-        }, 3000);
+        if (!resumen) return;
+        if (colocadas === 0) { resumen.innerHTML = '<p>Ninguna pieza colocada aún.</p>'; return; }
+        let html = '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">';
+        Object.entries(piezasColocadas).forEach(([pos, datos]) => {
+            html += `<div class="bg-white border border-gray-300 rounded p-1 text-xs">
+                <span class="font-semibold">Pieza ${datos.piezaId}</span> → ${pos}</div>`;
+        });
+        html += '</div>';
+        resumen.innerHTML = html;
     }
 
     function obtenerRespuesta() {
-        // Convertir colocaciones a formato esperado: [{fila: 0, columna: 0, pieza: 'A', color: 'red'}, ...]
-        const respuesta = Object.entries(colocaciones).map(([posicion, pieza]) => {
-            const [fila, columna] = posicion.split('-').map(Number);
-            return {
-                fila: fila,
-                columna: columna,
-                pieza: pieza.id,
-                color: pieza.color,
-                rotacion: pieza.rotacion !== undefined ? pieza.rotacion : 0
-            };
-        });
+        const totalCeldas  = document.querySelectorAll('.celda-hexagono[data-fija="false"]').length;
+        const totalPiezas  = piezasDisponibles.length;
+        const colocadas    = Object.keys(piezasColocadas).length;
 
-        return respuesta.length > 0 ? respuesta : null;
+        if (colocadas < totalPiezas) {
+            alert(`Por favor coloca todas las piezas. Faltan ${totalPiezas - colocadas}.`);
+            return null;
+        }
+
+        return Object.entries(piezasColocadas).map(([pos, datos]) => {
+            const [fila, columna] = pos.split('-').map(Number);
+            return { pieza: datos.piezaId, fila, columna };
+        });
     }
 
     function deshabilitarInteraccion() {
-        document.querySelectorAll('.pieza-item').forEach(pieza => {
-            pieza.draggable = false;
-            pieza.classList.add('opacity-50', 'cursor-not-allowed');
+        document.querySelectorAll('.pieza-item').forEach(p => {
+            p.draggable = false;
+            p.classList.add('opacity-50', 'cursor-not-allowed');
+            p.style.pointerEvents = 'none';
         });
-
-        document.querySelectorAll('.celda-hexagono').forEach(celda => {
-            celda.classList.add('cursor-not-allowed');
-            celda.style.pointerEvents = 'none';
+        document.querySelectorAll('.celda-hexagono[data-fija="false"]').forEach(c => {
+            c.style.pointerEvents = 'none';
         });
     }
 
-    // Cargar respuesta previa si existe
-    @if(isset($progresoUsuario) && $progresoUsuario && $progresoUsuario->respuesta_usuario)
-        const respuestaPrevia = @json($progresoUsuario->respuesta_usuario);
-        if (respuestaPrevia && Array.isArray(respuestaPrevia)) {
-            respuestaPrevia.forEach(item => {
-                if (item.fila !== undefined && item.columna !== undefined && item.pieza) {
-                    const celda = document.querySelector(`.celda-hexagono[data-fila="${item.fila}"][data-columna="${item.columna}"]`);
-                    if (celda && celda.dataset.fija !== 'true') {
-                        const piezaData = {
-                            id: item.pieza,
-                            color: item.color || piezasDisponibles.find(p => p.id === item.pieza)?.color || 'gray',
-                            imagen: item.imagen || piezasDisponibles.find(p => p.id === item.pieza)?.imagen || '',
-                            rotacion: item.rotacion !== undefined ? item.rotacion : 0
-                        };
-                        colocarPiezaEnCelda(celda, piezaData);
-                    }
-                }
+    // Cargar respuesta previa
+    @if(isset($progreso) && $progreso && $progreso->respuesta_usuario)
+        const respuestaPreviaRP = @json($progreso->respuesta_usuario);
+        if (Array.isArray(respuestaPreviaRP)) {
+            document.addEventListener('DOMContentLoaded', () => {
+                respuestaPreviaRP.forEach(item => {
+                    const celda = document.querySelector(
+                        `.celda-hexagono[data-fila="${item.fila}"][data-columna="${item.columna}"][data-fija="false"]`
+                    );
+                    if (celda) colocarPiezaEnCelda(celda, String(item.pieza));
+                });
             });
         }
     @endif
 </script>
-

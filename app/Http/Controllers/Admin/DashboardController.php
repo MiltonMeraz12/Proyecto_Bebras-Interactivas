@@ -3,60 +3,60 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Conjunto;
+use App\Models\ArchivoPdf;
 use App\Models\User;
-use App\Models\Pregunta;
 use App\Models\ProgresoUsuario;
-use Illuminate\Http\Request;
+use App\Models\SesionConjunto;
+use App\Models\Pregunta;
+use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(): View
     {
+        $totalAlumnos   = User::where('role', 'alumno')->count();
+        $totalPdfs      = ArchivoPdf::count();
+        $totalConjuntos = Conjunto::count();
+        $totalRespuestas= ProgresoUsuario::count();
+
         $alumnos = User::where('role', 'alumno')
-            ->with(['progresos.pregunta'])
+            ->withCount(['progresos'])
+            ->with(['sesionesConjunto' => fn($q) => $q->whereNotNull('terminado_en')])
+            ->latest()
             ->get();
         
-        $preguntas = Pregunta::orderBy('numero')->get();
-        
-        return view('admin.dashboard', compact('alumnos', 'preguntas'));
+        $conjuntos = Conjunto::withCount(['preguntas', 'sesiones'])
+            ->latest()
+            ->get();
+
+        $totalPreguntasSistema = Pregunta::where('activa', true)->count();
+
+        return view('admin.dashboard', compact(
+            'totalAlumnos', 'totalPdfs', 'totalConjuntos', 'totalRespuestas',
+            'alumnos', 'conjuntos', 'totalPreguntasSistema'
+        ));
     }
 
-    public function togglePregunta($id)
+    public function verProgreso($userId): View
     {
-        $id = (int) $id;
-        $pregunta = Pregunta::findOrFail($id);
-        $pregunta->activa = !$pregunta->activa;
-        $pregunta->save();
-
-        return response()->json([
-            'success' => true,
-            'activa' => $pregunta->activa,
-            'mensaje' => $pregunta->activa ? 'Pregunta activada' : 'Pregunta desactivada'
-        ]);
-    }
-
-    public function verProgreso($userId)
-    {
-        $userId = (int) $userId;
-        $alumno = User::with(['progresos.pregunta'])->findOrFail($userId);
-
-        if (! $alumno->isAlumno()) {
-            abort(404, 'No se encontró el progreso del alumno.');
-        }
-
-        $preguntas = Pregunta::orderBy('numero')->get();
+        $usuario = \App\Models\User::findOrFail($userId);
         
-        // Crear array de progreso
-        $progreso = [];
-        foreach ($preguntas as $pregunta) {
-            $progresoItem = $alumno->progresos->where('pregunta_id', $pregunta->id)->first();
-            $progreso[$pregunta->id] = [
-                'pregunta' => $pregunta,
-                'progreso' => $progresoItem,
-            ];
-        }
-        
-        return view('admin.progreso-alumno', compact('alumno', 'progreso'));
+        abort_if(!$usuario->isAlumno(), 404);
+
+        $sesiones = SesionConjunto::where('user_id', $usuario->id)
+            ->with(['conjunto.preguntas'])
+            ->latest()
+            ->get();
+
+        $progresos = ProgresoUsuario::where('user_id', $usuario->id)
+            ->with('pregunta')
+            ->get()
+            ->keyBy('pregunta_id');
+
+        return view('admin.alumnos.progreso', compact('usuario', 'sesiones', 'progresos'));
     }
     
 }

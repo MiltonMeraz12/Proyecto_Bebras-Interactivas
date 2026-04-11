@@ -12,14 +12,47 @@
             </div>
 
             <flux:navbar class="-mb-px max-lg:hidden">
-                
+                {{-- Visible SOLO para Administradores --}}
                 @if(auth()->user()?->isAdmin())
-                    <flux:navbar.item icon="layout-grid" :href="route('admin.dashboard')" :current="request()->routeIs('admin.*')" wire:navigate>
-                        {{ __('Panel') }}
+                    <flux:navbar.item icon="layout-grid"
+                        :href="route('admin.dashboard')"
+                        :current="request()->routeIs('admin.dashboard')"
+                        wire:navigate>
+                        {{ __('Panel Administrativo') }}
                     </flux:navbar.item>
-                    <flux:navbar.item icon="book-open" :href="route('preguntas.index')" :current="request()->routeIs('preguntas.*')" wire:navigate>
-                    {{ __('Biblioteca de Preguntas') }}
-                </flux:navbar.item>
+                    <flux:navbar.item icon="folder"
+                        :href="route('admin.conjuntos.index')"
+                        :current="request()->routeIs('admin.conjuntos.*')"
+                        wire:navigate>
+                        {{ __('Gestionar Conjuntos') }}
+                    </flux:navbar.item>
+                    <flux:navbar.item icon="document"
+                        :href="route('admin.pdfs.index')"
+                        :current="request()->routeIs('admin.pdfs.*')"
+                        wire:navigate>
+                        {{ __('Gestionar PDFs') }}
+                    </flux:navbar.item>
+                    <flux:navbar.item icon="photo"
+                        :href="route('admin.imagenes.index')"
+                        :current="request()->routeIs('admin.imagenes.*')"
+                        wire:navigate>
+                        {{ __('Gestionar Imágenes') }}
+                    </flux:navbar.item>
+                @endif
+
+                @if(auth()->user() && !auth()->user()->isAdmin())
+                    <flux:navbar.item icon="book-open"
+                        :href="route('conjuntos.index')"
+                        :current="request()->routeIs('conjuntos.*') && !request()->routeIs('recursos.*')"
+                        wire:navigate>
+                        {{ __('Mis conjuntos') }}
+                    </flux:navbar.item>
+                    <flux:navbar.item icon="document"
+                        :href="route('recursos.index')"
+                        :current="request()->routeIs('recursos.*')"
+                        wire:navigate>
+                        {{ __('Recursos PDF') }}
+                    </flux:navbar.item>
                 @endif
             </flux:navbar>
 
@@ -36,12 +69,8 @@
                     <flux:menu.radio.group>
                         <div class="p-0 text-sm font-normal">
                             <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-                                <span class="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-lg">
-                                    <span
-                                        class="flex h-full w-full items-center justify-center rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white"
-                                    >
-                                        {{ auth()->user()->initials() }}
-                                    </span>
+                                <span class="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-200 text-black dark:bg-neutral-700 dark:text-white font-bold">
+                                    {{ auth()->user()->initials() }}
                                 </span>
 
                                 <div class="grid flex-1 text-start text-sm leading-tight">
@@ -79,16 +108,55 @@
             </div>
 
             <flux:navlist variant="outline">
-                <flux:navlist.group :heading="__('Bebras Lab')">
-                    <flux:navlist.item icon="book-open" :href="route('preguntas.index')" :current="request()->routeIs('preguntas.*')" wire:navigate>
-                        {{ __('Biblioteca de Preguntas') }}
-                    </flux:navlist.item>
-                    @if(auth()->user()?->isAdmin())
-                        <flux:navlist.item icon="layout-grid" :href="route('admin.dashboard')" :current="request()->routeIs('admin.*')" wire:navigate>
-                            {{ __('Panel') }}
+                
+                {{-- Menú Móvil SOLO para Administradores --}}
+                @if(auth()->user()?->isAdmin())
+                    <flux:navlist.group :heading="__('Administración')">
+                        <flux:navlist.item icon="layout-grid" 
+                            :href="route('admin.dashboard')" 
+                            :current="request()->routeIs('admin.dashboard')" 
+                            wire:navigate>
+                            {{ __('Panel Administrativo') }}
                         </flux:navlist.item>
-                    @endif
-                </flux:navlist.group>
+                        <flux:navlist.item icon="folder" 
+                            :href="route('admin.conjuntos.index')" 
+                            :current="request()->routeIs('admin.conjuntos.*')" 
+                            wire:navigate>
+                            {{ __('Gestionar Conjuntos') }}
+                        </flux:navlist.item>
+                        <flux:navlist.item icon="document" 
+                            :href="route('admin.pdfs.index')" 
+                            :current="request()->routeIs('admin.pdfs.*')" 
+                            wire:navigate>
+                            {{ __('Gestionar PDFs') }}
+                        </flux:navlist.item>
+                        <flux:navlist.item icon="photo" 
+                            :href="route('admin.imagenes.index')" 
+                            :current="request()->routeIs('admin.imagenes.*')" 
+                            wire:navigate>
+                            {{ __('Gestionar Imágenes') }}
+                        </flux:navlist.item>
+                    </flux:navlist.group>
+                @endif
+
+                {{-- Menú Móvil SOLO para Alumnos --}}
+                @if(auth()->user() && !auth()->user()->isAdmin())
+                    <flux:navlist.group :heading="__('Bebras Lab')">
+                        <flux:navlist.item icon="book-open" 
+                            :href="route('conjuntos.index')" 
+                            :current="request()->routeIs('conjuntos.*') && !request()->routeIs('recursos.*')" 
+                            wire:navigate>
+                            {{ __('Mis conjuntos') }}
+                        </flux:navlist.item>
+                        <flux:navlist.item icon="document" 
+                            :href="route('recursos.index')" 
+                            :current="request()->routeIs('recursos.*')" 
+                            wire:navigate>
+                            {{ __('Recursos PDF') }}
+                        </flux:navlist.item>
+                    </flux:navlist.group>
+                @endif
+                
             </flux:navlist>
         </flux:sidebar>
 

@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\Pregunta;
 use App\Models\User;
+use App\Models\Conjunto;
+use App\Models\ArchivoPdf;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,22 +15,20 @@ class PreguntasSeeder extends Seeder
     public function run()
     {
         // crear un usuario
-        User::create([
-            'name' => 'Administrador',
-            'email' => 'admin@bebras.mx',
-            'password' => Hash::make('admin123'),
-            'role' => 'admin',
-        ]);
+        $admin = User::where('role', 'admin')->first();
 
-        // Crear algunos alumnos de ejemplo
-        User::create([
-            'name' => 'Alumno Ejemplo',
-            'email' => 'alumno@bebras.mx',
-            'password' => Hash::make('alumno123'),
-            'role' => 'alumno',
-        ]);
+        $pdf = ArchivoPdf::first();
+        $conjunto = Conjunto::firstOrCreate(
+            ['nombre' => 'Reto Bebras MX — Primavera 2025'],
+            [
+                'descripcion' => 'Conjunto de preguntas de la edición Primavera 2025. Incluye 27 tareas de pensamiento computacional.',
+                'pdf_id'      => $pdf?->id,
+                'creado_por'  => $admin->id,
+                'activo'      => true,
+            ]
+        );
 
-        $preguntas = [
+        $preguntas_old = [
             // PREGUNTA 01 - Libros Populares
             [
                 'numero' => '01',
@@ -1774,10 +1774,40 @@ En las mañanas, cuando los pilotos llegan a sacar sus aviones, la posición 1 s
 
         ];
 
-        foreach ($preguntas as $pregunta) {
-            // Asegurar que todas las preguntas estén activas por defecto
-            $pregunta['activa'] = true;
-            DB::table('preguntas')->insert($pregunta);
+        Pregunta::where('conjunto_id', $conjunto->id)->delete();
+
+        foreach ($preguntas_old as $index => $q) {
+            
+            // Unimos 'descripcion' y 'pregunta' en un solo 'enunciado'
+            $enunciadoFinal = $q['descripcion'];
+            if (isset($q['pregunta'])) {
+                $enunciadoFinal .= "\n\n" . $q['pregunta'];
+            }
+
+            // Seleccionamos la imagen principal
+            $imagenPrincipal = $q['imagen_descripcion'] ?? ($q['imagen_pregunta'] ?? null);
+
+            // Manejamos los JSONs de forma segura
+            $configuracion = is_string($q['configuracion']) ? $q['configuracion'] : json_encode($q['configuracion']);
+            $respuesta     = is_string($q['respuesta_correcta']) ? $q['respuesta_correcta'] : json_encode($q['respuesta_correcta']);
+
+            Pregunta::create([
+                'conjunto_id'        => $conjunto->id,
+                'orden'              => $index + 1,
+                'titulo'             => $q['titulo'],
+                'enunciado'          => $enunciadoFinal,
+                'imagen_enunciado'   => $imagenPrincipal,
+                'tipo_interaccion'   => $q['tipo_interaccion'],
+                'configuracion'      => json_decode($configuracion, true), // Eloquent se encarga de guardar como JSON si está en el $casts
+                'respuesta_correcta' => json_decode($respuesta, true),
+                'explicacion'        => $q['explicacion'],
+                'imagen_explicacion' => $q['imagen_respuesta'] ?? null,
+                'codigo_tarea'       => $q['codigo_tarea'] ?? null,
+                'pais_origen'        => $q['pais_origen'] ?? 'Desconocido',
+                'nivel'              => $q['nivel'] ?? 'I',
+                'dificultad'         => $q['dificultad'] ?? 'Media',
+                'activa'             => true,
+            ]);
         }
     }
 }

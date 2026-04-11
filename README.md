@@ -1,593 +1,594 @@
 # 🍯 Bebras MX - Laboratorio Interactivo
 
-> Plataforma educativa para competencias de pensamiento computacional basada en Bebras (Informatics Challenges for All).
+> Aplicación Laravel para administrar y resolver desafíos Bebras con preguntas interactivas y seguimiento de progreso.
 
-## 📋 Descripción del Proyecto
+## 🎯 Propósito del proyecto
 
-**Bebras MX** es una aplicación web interactiva diseñada para que estudiantes resuelvan desafíos de programación y pensamiento computacional. La plataforma cuenta con:
+Bebras MX replica la dinámica del concurso internacional Bebras: el administrador sube PDFs con los problemas oficiales, crea conjuntos de preguntas digitales basados en esos PDFs, y los alumnos los resuelven en la plataforma. El sistema registra cada respuesta, calcula la puntuación y muestra el progreso de cada alumno.
 
-- **27 preguntas/desafíos** de la competencia Bebras
-- **7 tipos de interacción** diferentes (selección simple, múltiple, ordenamiento, emparejamiento, rellenado, etc.)
-- **Sistema de roles** (administrador y usuario)
-- **Seguimiento de progreso** de usuarios
-- **Autenticación segura** con 2FA
-- **Dashboard administrativo** para monitoreo
+## 🛠️ Stack tecnológico
 
-## 🛠️ Stack Tecnológico
+| Capa        | Tecnología                   | Versión |
+| ----------- | ---------------------------- | ------- |
+| Backend     | Laravel                      | 12.x    |
+| Frontend    | Livewire Flux + Tailwind CSS | Latest  |
+| Auth        | Laravel Fortify + 2FA        | 1.30+   |
+| DB          | MySQL 8                      | —       |
+| Assets      | Vite                         | 7.x     |
+| Drag & Drop | SortableJS (CDN)             | 1.15.2  |
+| Contenedor  | Laravel Sail / Docker        | —       |
 
-| Tecnología       | Versión | Uso                    |
-| ---------------- | ------- | ---------------------- |
-| **PHP**          | 8.2+    | Backend                |
-| **Laravel**      | 12.0    | Framework principal    |
-| **MySQL**        | 8.0     | Base de datos          |
-| **Node.js**      | 18+     | Build tools            |
-| **Vite**         | 7.0+    | Asset bundler          |
-| **Tailwind CSS** | 4.0+    | Utilidad CSS           |
-| **Livewire**     | 3.x     | Componentes dinámicos  |
-| **Volt**         | 1.7+    | Componentes full-stack |
-| **Docker**       | Latest  | Containerización       |
-| **Laravel Sail** | 1.41+   | Orquestación Docker    |
-
-## 🚀 Inicio Rápido
-
-### Requisitos Previos
-
-- Docker y Docker Compose instalados
-- Git
-- Editor de código (VSCode)
-
-### 1. Clonar el repositorio
+## 🚀 Instalación rápida
 
 ```bash
-git clone <tu-repositorio>
-cd bebras-mx
-```
+# 1. Clonar y entrar
+git clone <repo> && cd bebras-mx
 
-### 2. Configurar variables de entorno
-
-```bash
+# 2. Variables de entorno
 cp .env.example .env
-```
 
-Editar `.env` si es necesario (por defecto usa SQLite para desarrollo):
-
-```env
-APP_NAME=Bebras\ Lab
-APP_ENV=local
-APP_KEY=
-APP_DEBUG=true
-APP_URL=http://localhost
-
-# Para usar MySQL en Docker (opcional):
-# DB_CONNECTION=mysql
-# DB_HOST=mysql
-# DB_DATABASE=bebras
-# DB_USERNAME=sail
-# DB_PASSWORD=password
-```
-
-### 3. Iniciar con Laravel Sail
-
-```bash
-# Primer inicio (descarga imágenes Docker)
+# 3. Iniciar Docker (primer arranque descarga imágenes)
 ./vendor/bin/sail up -d
 
-# O si prefieres una línea:
-docker run --rm \
-    -u "$(id -u):$(id -g)" \
-    -v "$(pwd)":/var/www/html \
-    -w /var/www/html \
-    laravelsail/php82-composer:latest \
-    composer install --ignore-platform-reqs
-```
+# 4. Instalar dependencias PHP
+./vendor/bin/sail composer install
 
-### 4. Generar clave de aplicación e inicializar BD
-
-```bash
+# 5. Generar clave, migrar y sembrar
 ./vendor/bin/sail artisan key:generate
-./vendor/bin/sail artisan migrate --seed
+./vendor/bin/sail artisan migrate:fresh --seed
+
+# 6. Symlink de storage (PDFs e imágenes)
+./vendor/bin/sail artisan storage:link
+
+# 7. Assets frontend
+./vendor/bin/sail npm install && ./vendor/bin/sail npm run build
 ```
-
-### 5. Instalar dependencias de Node.js y compilar assets
-
-```bash
-./vendor/bin/sail npm install
-./vendor/bin/sail npm run build
-```
-
-### 6. Acceder a la aplicación
-
-- **Aplicación**: [http://localhost](http://localhost)
-- **Admin Dashboard**: [http://localhost/admin/dashboard](http://localhost/admin/dashboard)
 
 **Credenciales de ejemplo:**
 
-- Email Admin: `admin@brebas.com` (cuenta admin creada por seeder)
-- Email Alumno: `alumno@brebas.com`
-- Contraseña: `admin123`- `alumno123`
+- Admin: `admin@bebras.mx` / `admin123`
+- Alumno: `alumno@bebras.mx` / `alumno123`
 
-## 📁 Estructura del Proyecto
+## 👥 Roles y flujos
 
-```
-bebras-mx/
-├── app/
-│   ├── Actions/              # Actions de Fortify
-│   ├── Enums/
-│   │   └── TipoInteraccion.php  # Tipos de interacción disponibles
-│   ├── Http/
-│   │   ├── Controllers/       # Controladores principales
-│   │   │   ├── PreguntaController.php     # Lógica de preguntas
-│   │   │   └── Admin/DashboardController.php  # Admin panel
-│   │   └── Middleware/        # Middleware (admin, etc.)
-│   ├── Livewire/              # Componentes Livewire
-│   │   └── Actions/
-│   └── Models/
-│       ├── Pregunta.php           # Modelo de preguntas
-│       ├── ProgresoUsuario.php    # Seguimiento de progreso
-│       └── User.php               # Modelo de usuarios
-│
-├── database/
-│   ├── migrations/            # Migraciones de BD
-│   ├── seeders/               # Seeders (datos iniciales)
-│   └── factories/             # Factories para testing
-│
-├── resources/
-│   ├── css/
-│   │   └── app.css            # Estilos principales
-│   ├── js/
-│   │   └── app.js             # JavaScript principal
-│   └── views/
-│       ├── preguntas/         # Vistas de preguntas
-│       │   ├── tipos/         # Vistas por tipo de interacción
-│       │   ├── scripts/       # Scripts de validación
-│       │   └── show.blade.php # Vista principal
-│       ├── admin/             # Vistas administrativas
-│       ├── layouts/           # Layouts base
-│       ├── livewire/          # Componentes Volt
-│       └── welcome.blade.php  # Página principal
-│
-├── routes/
-│   ├── web.php                # Rutas web principales
-│   └── console.php            # Comandos Artisan
-│
-├── tests/                     # Tests (Pest PHP)
-│   ├── Feature/
-│   └── Unit/
-│
-├── config/
-│   ├── app.php                # Configuración general
-│   ├── auth.php               # Autenticación
-│   ├── database.php           # Base de datos
-│   ├── fortify.php            # Configuración Fortify (2FA)
-│   └── ...
-│
-├── compose.yaml               # Configuración Docker
-├── package.json               # Dependencias frontend
-├── composer.json              # Dependencias backend
-├── vite.config.js             # Configuración Vite
-└── phpunit.xml                # Configuración Pest
-```
+### Administrador (`role = 'admin'`)
 
-## 🗄️ Base de Datos
+Login → /admin/dashboard
+├── Gestionar PDFs → /admin/pdfs
+├── Gestionar Conjuntos → /admin/conjuntos
+│ └── Ver conjunto → /admin/conjuntos/{id}
+│ └── Agregar/Editar preguntas
+└── Ver progreso alumno → /admin/alumnos/{id}/progreso
 
-### Modelos Principales
+### Alumno (`role = 'alumno'`)
 
-#### **User**
+Login → /conjuntos
+├── Ver conjunto → /conjuntos/{id}
+├── Iniciar → POST /conjuntos/{id}/iniciar
+├── Resolver → /conjuntos/{id}/preguntas/{pregunta_id}
+├── Verificar → POST .../verificar
+├── Finalizar → PATCH /conjuntos/{id}/finalizar
+├── Ver resultados → /conjuntos/{id}/resultados
 
-- `id` (PK)
-- `name`, `email`, `password`
-- `role` ('admin' | 'user') - Agregado reciente
-- `two_factor_secret`, `two_factor_recovery_codes` (Fortify)
-- Relación: `hasMany(ProgresoUsuario)`
+## 🗂 Arquitectura General
 
-#### **Pregunta**
+### Capas principales
 
-- `id` (PK)
-- `numero` (1-27)
-- `titulo`, `descripcion`, `pregunta` (contenido)
-- `imagen_descripcion`, `imagen_pregunta`, `imagen_respuesta` (URIs)
-- `tipo_interaccion` (tipo de pregunta)
-- `configuracion` (JSON - parámetros específicos)
-- `respuesta_correcta` (JSON - respuesta esperada)
-- `explicacion` (retroalimentación)
-- `nivel`, `dificultad`, `pais_origen`, `codigo_tarea` (metadata)
-- `activa` (boolean) - Agregado reciente
-- Relación: `hasMany(ProgresoUsuario)`
+- **`app/Models/`** → Modelos dominantes: `User`, `ArchivoPdf`, `Conjunto`, `Pregunta`, `SesionConjunto`, `ProgresoUsuario`
+    - Define relaciones Eloquent: belongsTo, hasMany, etc.
+    - Scopes para consultas comunes (activos, activas).
+    - Casts para arrays JSON (configuracion, respuesta_correcta).
+- **`app/Http/Controllers/`** → Controladores de usuario y admin
+    - `ConjuntoController`: Gestión de sesiones de conjunto, navegación de preguntas.
+    - `PreguntaController`: Validación de respuestas según tipo de interacción.
+    - `Admin/*`: CRUD para PDFs, conjuntos y preguntas.
+- **`app/Http/Middleware/`** → `AdminMiddleware` para proteger el área admin
+- **`app/Enums/`** → `TipoInteraccion`: Enum con tipos de interacción soportados (aunque no todos implementados).
+- **`routes/web.php`** → Rutas web con middleware `auth` y `admin`
+    - Rutas públicas: home, welcome.
+    - Autenticadas: conjuntos, preguntas, resultados.
+    - Admin: dashboard, CRUD de recursos.
+- **`resources/views/`** → Vistas Blade para alumnos y administración
+    - `conjuntos/`: index, show, resultados.
+    - `preguntas/`: show con tipos dinámicos, scripts JS.
+    - `admin/`: dashboard, CRUD forms con diseño consistente.
+- **`database/migrations/`** → Esquema de datos para usuarios, PDFs, conjuntos, preguntas y progreso
+    - Relaciones foreign keys, JSON para configuraciones.
+- **`database/seeders/`** → Seeders para datos iniciales
+    - `UserSeeder`: Admin y alumnos de prueba.
+    - `PdfSeeder`, `ConjuntoSeeder`, `PreguntasSeeder`: Datos Bebras.
+- **`public/`** → Archivos estáticos accesibles
+    - `index.php`: Punto de entrada Laravel.
+    - `storage/`: Link simbólico a storage/app/public para archivos subidos (PDFs, imágenes).
+    - `build/`: Assets compilados (CSS, JS) via Vite.
+- **`storage/`** → Archivos privados y temporales
+    - `app/public/`: PDFs e imágenes subidas por admin.
+    - `logs/`: Registros de errores y actividad.
 
-#### **ProgresoUsuario**
+## 🚀 Flujo principal del alumno
 
-- `id` (PK)
-- `user_id` (FK → User)
-- `pregunta_id` (FK → Pregunta)
-- `respuesta_usuario` (JSON - respuesta enviada)
-- `correcta` (boolean)
-- `intentos` (int)
-- `tiempo_completado` (timestamp)
-- Relaciones: `belongsTo(User)`, `belongsTo(Pregunta)`
+1. Un alumno inicia sesión y visita `/conjuntos`
+2. Visualiza conjuntos activos disponibles
+3. Entra a un conjunto `/conjuntos/{conjunto}`
+4. Inicia sesión de conjunto con `POST /conjuntos/{conjunto}/iniciar`
+5. Resuelve preguntas en `/conjuntos/{conjunto}/preguntas/{pregunta}`
+6. Envía respuesta a `/conjuntos/{conjunto}/preguntas/{pregunta}/verificar`
+7. Finaliza con `PATCH /conjuntos/{conjunto}/finalizar`
+8. Consulta resultados en `/conjuntos/{conjunto}/resultados`
 
-### Migraciones
+## 🔐 Autenticación y roles
 
-| Archivo                                                       | Descripción                  | Estado |
-| ------------------------------------------------------------- | ---------------------------- | ------ |
-| `0001_01_01_000000_create_users_table.php`                    | Tabla de usuarios base       | ✅     |
-| `0001_01_01_000001_create_cache_table.php`                    | Caché de Laravel             | ✅     |
-| `0001_01_01_000002_create_jobs_table.php`                     | Queue jobs                   | ✅     |
-| `2025_09_02_075243_add_two_factor_columns_to_users_table.php` | 2FA (Fortify)                | ✅     |
-| `2025_11_12_141658_preguntas_table.php`                       | Tabla principal de preguntas | ✅     |
-| `2025_11_14_034334_add_role_to_users_table.php`               | Roles de usuario             | ✅     |
-| `2025_11_14_034349_add_activa_to_preguntas_table.php`         | Status de preguntas          | ✅     |
+- Rutas de alumno protegidas por middleware `auth`
+- Admin protegido por middleware `admin`
+- El `dashboard` post-login redirige según rol:
+    - admin → `admin.dashboard`
+    - alumno → `conjuntos.index`
 
-## 🎯 Tipos de Interacción
+## �️ Base de datos
 
-### Implementados (7 tipos)
-
-| #   | Tipo                 | Preguntas | Estado | Descripción                         |
-| --- | -------------------- | --------- | ------ | ----------------------------------- |
-| 1   | `seleccion_simple`   | 13        | ✅     | Elegir una opción correcta          |
-| 2   | `seleccion_multiple` | 2         | ✅     | Elegir múltiples opciones correctas |
-| 3   | `ordenar`            | 4         | ✅     | Ordenar elementos (SortableJS)      |
-| 4   | `grid_seleccion`     | 2         | ✅     | Seleccionar celdas en grid          |
-| 5   | `emparejar`          | 1         | ✅     | Emparejar elementos                 |
-| 6   | `rellenar`           | 1         | ✅     | Rellenar espacios en blanco         |
-| 7   | `texto_libre`        | 1         | ✅     | Respuesta texto abierta             |
-
-**Total preguntas implementadas: 24/27 (89%)**
-
-### Sin Implementar (3 preguntas)
-
-#### ❌ Pregunta 15 - Panal de Abejas
-
-- **Tipo sugerido**: `colocar_piezas` (nuevo) o adaptar `grid_seleccion`
-- **Descripción**: Colocar abejas en un panal hexagonal
-- **Configuración**: Grid hexagonal con 19 celdas, 7 abejas
-- **Respuesta**: Array de objetos con posiciones
-- **Prioridad**: Media
-
-#### ❌ Pregunta 21 - Hexágonos de Colores
-
-- **Tipo sugerido**: Adaptar `rellenar` para estructura piramidal
-- **Descripción**: Colorear hexágonos en pirámide
-- **Configuración**: Estructura 5 filas, 3 colores
-- **Respuesta**: Array de objetos con posiciones y colores
-- **Prioridad**: Media
-
-#### ❌ Pregunta 26 - Tejiendo Alfombras
-
-- **Tipo sugerido**: Adaptar `grid_seleccion` para múltiples símbolos
-- **Descripción**: Rellenar grid 6x6 con símbolos
-- **Configuración**: Grid 6x6, 4 símbolos (Morado, Rojo, Amarillo, Verde)
-- **Respuesta**: Array 2D con símbolos
-- **Prioridad**: Media
-
-## 📊 Arquitectura de Rutas
-
-### Rutas Públicas
+### Diagrama de relaciones
 
 ```
-GET  /                   → Página de bienvenida
+users (1) ──────────────────────────────────────────── (N) progreso_usuarios
+│                                                           │
+├── (1:N) sesiones_conjunto                          pregunta_id FK
+├── (1:N) archivos_pdf [subido_por]                        │
+└── (1:N) conjuntos [creado_por]                      preguntas (N)
+│                                      conjunto_id FK
+pdf_id FK                                           │
+│                                      conjuntos (1)
+archivos_pdf (1)
 ```
 
-### Rutas Autenticadas
-
-```
-GET  /dashboard          → Redirige según rol (admin o usuario)
-GET  /preguntas          → Listado de preguntas para resolver
-GET  /preguntas/{id}     → Vista de pregunta específica
-POST /preguntas/{id}/verificar → Validar respuesta
-
-GET  /settings/profile   → Perfil de usuario
-GET  /settings/password  → Cambiar contraseña
-GET  /settings/two-factor → Configurar 2FA
-```
-
-### Rutas Administrativas (solo admin)
-
-```
-GET  /admin/dashboard                → Dashboard principal
-GET  /admin/alumno/{id}/progreso     → Ver progreso de estudiante
-POST /admin/preguntas/{id}/toggle    → Activar/desactivar pregunta
-```
-
-## 🔐 Autenticación y Seguridad
-
-### Sistemas Implementados
-
-- **Fortify**: Autenticación completa (registro, login, 2FA)
-- **2-Factor Authentication**: SMS/TOTP (configurable)
-- **Email Verification**: Verificación de correo necesaria
-- **Roles**: Admin y Usuario
-- **Middleware**: Protección de rutas (`auth`, `verified`, `admin`)
-
-### Configuración en `config/fortify.php`
-
-- ✅ Registro de usuarios
-- ✅ Reset de contraseñas
-- ✅ Verificación de email
-- ✅ Two-Factor Auth
-- ❌ Actualizaciones de perfil (deshabilitado)
-
-## 🐳 Docker y Desarrollo
-
-### Laravel Sail
-
-Sail es la abstracción Docker ligera de Laravel:
-
-```bash
-# Iniciar servicios
-./vendor/bin/sail up -d
-
-# Iniciar en primer plano (ver logs)
-./vendor/bin/sail up
-
-# Detener servicios
-./vendor/bin/sail down
-
-# Ver logs
-./vendor/bin/sail logs -f
-
-# Ejecutar comandos en el contenedor
-./vendor/bin/sail artisan <comando>
-./vendor/bin/sail npm <comando>
-```
-
-### Servicios Incluidos
-
-- **laravel.test** (PHP 8.4 + Apache): Aplicación principal
-- **mysql** (8.0): Base de datos
-
-### Configuración
-
-- Puerto HTTP: `APP_PORT` (default: 80)
-- Puerto Vite: `VITE_PORT` (default: 5173)
-- Base de datos MySQL: puerto `FORWARD_DB_PORT` (default: 3306)
-
-## 📦 Compilación de Assets
-
-### Desarrollo (watch mode)
-
-```bash
-./vendor/bin/sail npm run dev
-```
-
-Inicia Vite en modo desarrollo con hot reload.
-
-### Producción
-
-```bash
-./vendor/bin/sail npm run build
-```
-
-Compila y minifica assets para producción.
-
-### Assets Monitoreados
-
-- `resources/css/app.css` → `public/build/assets/app.css`
-- `resources/js/app.js` → `public/build/assets/app.js`
-- Componentes Blade/Volt
-
-## 🧪 Testing
-
-El proyecto usa **Pest PHP** para testing:
-
-```bash
-# Ejecutar todos los tests
-./vendor/bin/sail artisan test
-
-# Con output detallado
-./vendor/bin/sail artisan test --verbose
-
-# Filtrar tests
-./vendor/bin/sail artisan test --filter NombreDel Test
-
-# Coverage de código
-./vendor/bin/sail artisan test --coverage
-```
-
-### Ubicación de Tests
-
-- `/tests/Feature/` - Tests de funcionalidad
-- `/tests/Unit/` - Tests unitarios
-- `/tests/TestCase.php` - Clase base
-
-## 📝 Comandos Útiles
-
-### Artisan
-
-```bash
-# Configuración
-./vendor/bin/sail artisan key:generate           # Generar APP_KEY
-./vendor/bin/sail artisan config:clear           # Limpiar caché de config
-./vendor/bin/sail artisan cache:clear            # Limpiar caché general
-
-# Base de Datos
-./vendor/bin/sail artisan migrate                # Ejecutar migraciones
-./vendor/bin/sail artisan migrate:rollback       # Revertir última migración
-./vendor/bin/sail artisan migrate:refresh        # Reset + migraciones
-./vendor/bin/sail artisan db:seed                # Ejecutar seeders
-./vendor/bin/sail artisan migrate:fresh --seed   # Limpiar + migrar + seed
-
-# Views y Cache
-./vendor/bin/sail artisan view:clear             # Limpiar caché de vistas
-./vendor/bin/sail artisan route:clear            # Limpiar caché de rutas
-./vendor/bin/sail artisan optimize:clear         # Limpiar todo
-
-# Tinker (REPL)
-./vendor/bin/sail artisan tinker                 # Consola interactiva
-
-# Pint (Linting)
-./vendor/bin/sail pint                           # Verificar estilo
-./vendor/bin/sail pint --fix                     # Arreglar estilo
-```
-
-### npm
-
-```bash
-./vendor/bin/sail npm run dev           # Desarrollo (watch)
-./vendor/bin/sail npm run build         # Producción
-./vendor/bin/sail npm install           # Instalar dependencias
-./vendor/bin/sail npm update            # Actualizar dependencias
-```
-
-## 🔧 Configuración en Producción
-
-### variables de entorno a cambiar
-
-Consulta [LARAVEL_CLOUD_SETUP.md](LARAVEL_CLOUD_SETUP.md) para instrucciones específicas de Laravel Cloud.
-
-**Configuración mínima recomendada:**
-
-```env
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=<generar con php artisan key:generate>
-APP_URL=https://tu-dominio.com
-
-LOG_CHANNEL=stack
-LOG_LEVEL=error
-
-DB_CONNECTION=mysql
-DB_HOST=<tu-host>
-DB_PORT=3306
-DB_DATABASE=bebras
-DB_USERNAME=<usuario>
-DB_PASSWORD=<contraseña-segura>
-
-CACHE_STORE=redis
-SESSION_DRIVER=cookie
-SESSION_ENCRYPT=true
-QUEUE_CONNECTION=database
-
-# Email
-MAIL_DRIVER=smtp
-MAIL_HOST=<host-smtp>
-MAIL_PORT=587
-MAIL_USERNAME=<usuario>
-MAIL_PASSWORD=<password>
-MAIL_FROM_ADDRESS=noreply@tu-dominio.com
-```
-
-### Pasos de Despliegue
-
-1. Clonar repo en servidor
-2. Configurar `.env` con valores de producción
-3. Ejecutar `composer install --no-dev`
-4. Ejecutar `php artisan optimize:cache`
-5. Ejecutar `npm run build`
-6. Ejecutar `php artisan migrate --force`
-7. Configurar `public/storage` → `storage/app/public` (symlink)
-8. Configurar permisos: `chown -R www-data:www-data storage bootstrap/cache`
-9. Configurar nginx con `public/index.php` como entry point
-10. Configurar cron job: `* * * * * cd /path-to-app && php artisan schedule:run >> /dev/null 2>&1`
-
-## ⚠️ Problemas Detectados y TODOs
-
-### Errores Actuales
-
-#### 1. Error en Vista de Preguntas Sin Tipo
-
-**Archivo**: [resources/views/preguntas/show.blade.php](resources/views/preguntas/show.blade.php) (línea 83)
-
-- **Problema**: Si `tipo_interaccion` está vacío, genera error al incluir archivo vacío
-- **Impacto**: Preguntas 15, 21, 26 causarán error
-- **Solución recomendada**: Agregar validación
-
-```php
-@if(!empty($pregunta->tipo_interaccion))
-    @include('preguntas.tipos.' . $pregunta->tipo_interaccion)
-@else
-    <div class="alert alert-warning">
-        Esta pregunta aún no tiene tipo de interacción implementado.
-    </div>
+### Tablas
+
+#### `users`
+
+| Campo                       | Tipo      | Notas                   |
+| --------------------------- | --------- | ----------------------- |
+| `id`                        | bigint    | PK                      |
+| `name`                      | string    | —                       |
+| `email`                     | string    | unique                  |
+| `role`                      | string    | `'admin'` \| `'alumno'` |
+| `password`                  | string    | hashed                  |
+| `two_factor_secret`         | text      | Fortify 2FA             |
+| `two_factor_recovery_codes` | text      | Fortify 2FA             |
+| `two_factor_confirmed_at`   | timestamp | nullable                |
+| `remember_token`            | string    | nullable                |
+
+#### `archivos_pdf`
+
+| Campo             | Tipo   | Notas              |
+| ----------------- | ------ | ------------------ |
+| `id`              | bigint | PK                 |
+| `nombre`          | string | Nombre legible     |
+| `descripcion`     | string | nullable           |
+| `nombre_original` | string | Nombre al subir    |
+| `ruta`            | string | `pdfs/archivo.pdf` |
+| `tamanio`         | bigint | Bytes              |
+| `subido_por`      | bigint | FK → users         |
+
+#### `conjuntos`
+
+| Campo         | Tipo    | Notas                       |
+| ------------- | ------- | --------------------------- |
+| `id`          | bigint  | PK                          |
+| `nombre`      | string  | —                           |
+| `descripcion` | text    | nullable                    |
+| `pdf_id`      | bigint  | FK → archivos_pdf, nullable |
+| `creado_por`  | bigint  | FK → users                  |
+| `activo`      | boolean | default true                |
+
+#### `preguntas`
+
+| Campo                | Tipo    | Notas                           |
+| -------------------- | ------- | ------------------------------- |
+| `id`                 | bigint  | PK                              |
+| `conjunto_id`        | bigint  | FK → conjuntos (cascade delete) |
+| `orden`              | int     | Posición en el conjunto         |
+| `titulo`             | string  | —                               |
+| `enunciado`          | text    | Texto completo del problema     |
+| `imagen_enunciado`   | string  | Ruta en storage, nullable       |
+| `tipo_interaccion`   | string  | Ver enum abajo                  |
+| `configuracion`      | json    | Opciones, elementos, etc.       |
+| `respuesta_correcta` | json    | Formato varía por tipo          |
+| `explicacion`        | text    | Se muestra tras responder       |
+| `imagen_explicacion` | string  | Ruta en storage, nullable       |
+| `codigo_tarea`       | string  | Ej: `2022-DE-06`, nullable      |
+| `pais_origen`        | string  | nullable                        |
+| `nivel`              | string  | I, II, III, IV, V, VI           |
+| `dificultad`         | string  | Baja, Media, Alta               |
+| `activa`             | boolean | default true                    |
+
+#### `sesiones_conjunto`
+
+| Campo          | Tipo                       | Notas                          |
+| -------------- | -------------------------- | ------------------------------ |
+| `id`           | bigint                     | PK                             |
+| `user_id`      | bigint                     | FK → users                     |
+| `conjunto_id`  | bigint                     | FK → conjuntos                 |
+| `iniciado_en`  | timestamp                  | —                              |
+| `terminado_en` | timestamp                  | nullable                       |
+| `puntuacion`   | int                        | nullable (al terminar)         |
+| UNIQUE         | (`user_id`, `conjunto_id`) | Una sesión por alumno/conjunto |
+
+#### `progreso_usuarios`
+
+| Campo               | Tipo                       | Notas                             |
+| ------------------- | -------------------------- | --------------------------------- |
+| `id`                | bigint                     | PK                                |
+| `user_id`           | bigint                     | FK → users                        |
+| `pregunta_id`       | bigint                     | FK → preguntas                    |
+| `respuesta_usuario` | json                       | Lo que envió el alumno            |
+| `es_correcta`       | boolean                    | —                                 |
+| `intentos`          | int                        | default 1                         |
+| `completada_at`     | timestamp                  | —                                 |
+| UNIQUE              | (`user_id`, `pregunta_id`) | Una respuesta por alumno/pregunta |
+
+## 🧠 Controladores clave
+
+### `App\Http\Controllers\ConjuntoController`
+
+- **`index()`** → Lista conjuntos activos con PDF y conteo de preguntas activas. Incluye sesiones del alumno para mostrar estado (no iniciado, en progreso, completado).
+- **`show()`** → Detalle del conjunto antes de iniciar. Carga preguntas activas, sesiones existentes y progreso del alumno.
+- **`iniciar()`** → Crea `SesionConjunto` si no existe, redirige a primera pregunta activa.
+- **`finalizar()`** → Calcula puntuación total (respuestas correctas), marca sesión como terminada.
+- **`resultados()`** → Muestra preguntas y progreso del alumno en el conjunto.
+
+### `App\Http\Controllers\PreguntaController`
+
+- **`show()`** → Valida que pregunta pertenece al conjunto y sesión está activa. Carga progreso existente.
+- **`verificar()`** → Valida respuesta según `tipo_interaccion` usando métodos especializados:
+    - `validarSeleccionSimple()`, `validarSeleccionMultiple()`, `validarOrdenar()`, etc.
+    - Previene doble envío, guarda en `ProgresoUsuario`, retorna JSON con `correcta`, `explicacion`.
+- Métodos de validación por tipo: Comparan respuesta del alumno con `respuesta_correcta` del modelo.
+
+### `App\Http\Controllers\Admin\DashboardController`
+
+- **`index()`** → Métricas: total alumnos, PDFs, conjuntos, respuestas. Lista alumnos con conteo de progresos y sesiones completadas.
+- **`verProgreso($userId)`** → Progreso detallado de un alumno: sesiones por conjunto, preguntas respondidas, puntuaciones.
+
+### `App\Http\Controllers\Admin\AdminConjuntoController`
+
+- CRUD completo: `index`, `create`, `store`, `show`, `edit`, `update`, `destroy`.
+- **`toggle()`** → Activa/desactiva conjuntos.
+
+### `App\Http\Controllers\Admin\AdminPreguntaController`
+
+- CRUD de preguntas dentro de un conjunto.
+- Convierte JSON textual de `configuracion` y `respuesta_correcta` a arrays.
+- Lista de tipos de interacción codificada localmente (debería usar `TipoInteraccion::values()`).
+- **`toggle()`** → Activa/desactiva preguntas.
+
+### `App\Http\Controllers\Admin\PdfController`
+
+- Gestión de PDFs: subida segura (`mimes:pdf`), validación de tamaño.
+- Eliminación condicionada: solo si no tiene conjuntos asociados.
+
+## 🧩 Rutas principales
+
+### Alumno
+
+- `GET /conjuntos` → `conjuntos.index`
+- `GET /conjuntos/{conjunto}` → `conjuntos.show`
+- `POST /conjuntos/{conjunto}/iniciar` → `conjuntos.iniciar`
+- `GET /conjuntos/{conjunto}/preguntas/{pregunta}` → `preguntas.show`
+- `POST /conjuntos/{conjunto}/preguntas/{pregunta}/verificar` → `preguntas.verificar`
+- `PATCH /conjuntos/{conjunto}/finalizar` → `conjuntos.finalizar`
+- `GET /conjuntos/{conjunto}/resultados` → `conjuntos.resultados`
+
+### Admin
+
+- `GET /admin/dashboard` → `admin.dashboard`
+- `GET /admin/alumnos/{usuario}/progreso` → `admin.alumnos.progreso`
+- CRUD de PDFs: `admin/pdfs`
+- CRUD de conjuntos: `admin/conjuntos`
+- CRUD de preguntas dentro de un conjunto: `admin/conjuntos/{conjunto}/preguntas`
+
+## 🛣️ Rutas completas
+
+### Públicas
+
+GET / → home (welcome)
+
+### Autenticadas (`auth`)
+
+GET /dashboard → Redirige según rol
+GET /conjuntos → conjuntos.index (dashboard alumno)
+GET /conjuntos/{conjunto} → conjuntos.show
+POST /conjuntos/{conjunto}/iniciar → conjuntos.iniciar
+GET /conjuntos/{conjunto}/preguntas/{pregunta} → preguntas.show
+POST /conjuntos/{conjunto}/preguntas/{pregunta}/verificar → preguntas.verificar
+PATCH /conjuntos/{conjunto}/finalizar → conjuntos.finalizar
+GET /conjuntos/{conjunto}/resultados → conjuntos.resultados
+GET /settings/profile → profile.edit (Volt)
+GET /settings/password → user-password.edit (Volt)
+GET /settings/appearance → appearance.edit (Volt)
+GET /settings/two-factor → two-factor.show (Volt/Fortify)
+
+### Admin (`auth` + `admin`)
+
+GET /admin/dashboard → admin.dashboard
+GET /admin/alumnos/{usuario}/progreso → admin.alumnos.progreso
+GET /admin/pdfs → admin.pdfs.index
+GET /admin/pdfs/create → admin.pdfs.create
+POST /admin/pdfs → admin.pdfs.store
+GET /admin/pdfs/{archivoPdf} → admin.pdfs.show
+DELETE /admin/pdfs/{archivoPdf} → admin.pdfs.destroy
+GET /admin/conjuntos → admin.conjuntos.index
+GET /admin/conjuntos/create → admin.conjuntos.create
+POST /admin/conjuntos → admin.conjuntos.store
+GET /admin/conjuntos/{conjunto} → admin.conjuntos.show
+GET /admin/conjuntos/{conjunto}/edit → admin.conjuntos.edit
+PATCH /admin/conjuntos/{conjunto} → admin.conjuntos.update
+DELETE /admin/conjuntos/{conjunto} → admin.conjuntos.destroy
+PATCH /admin/conjuntos/{conjunto}/toggle → admin.conjuntos.toggle
+GET /admin/conjuntos/{conjunto}/preguntas/create → admin.preguntas.create
+POST /admin/conjuntos/{conjunto}/preguntas → admin.preguntas.store
+GET /admin/conjuntos/{conjunto}/preguntas/{pregunta}/edit → admin.preguntas.edit
+PATCH /admin/conjuntos/{conjunto}/preguntas/{pregunta} → admin.preguntas.update
+DELETE /admin/conjuntos/{conjunto}/preguntas/{pregunta} → admin.preguntas.destroy
+PATCH /admin/conjuntos/{conjunto}/preguntas/{pregunta}/toggle → admin.preguntas.toggle
+
+## 🎨 Vistas relevantes
+
+### Alumno
+
+- **`resources/views/conjuntos/index.blade.php`**
+    - Lista de conjuntos activos con estado de sesión (botones "Iniciar", "Continuar", "Ver resultados").
+    - Muestra PDF asociado, número de preguntas, sesiones del alumno.
+- **`resources/views/conjuntos/show.blade.php`**
+    - Detalle del conjunto: descripción, PDF, lista de preguntas con estado (no respondida, correcta, incorrecta).
+    - Botón para iniciar sesión.
+- **`resources/views/conjuntos/resultados.blade.php`**
+    - Resultados finales: puntuación, preguntas con respuestas del alumno y correctas, explicaciones.
+- **`resources/views/preguntas/show.blade.php`**
+    - Plantilla principal: enunciado, imagen, área de interacción dinámica (`preguntas.tipos.{tipo_interaccion}`).
+    - Navegación entre preguntas, botón "Verificar" (deshabilitado si ya respondida).
+    - Incluye scripts JS (`preguntas.scripts.{tipo_interaccion}`).
+    - Validación: Si `tipo_interaccion` vacío, muestra mensaje de advertencia.
+- **`resources/views/preguntas/tipos/*.blade.php`**
+    - Vistas específicas por tipo: `seleccion_simple`, `ordenar`, etc.
+    - Renderizan la interfaz de interacción basada en `configuracion`.
+- **`resources/views/preguntas/scripts/*.blade.php`**
+    - Scripts JS para interactividad: drag&drop (SortableJS), validaciones, AJAX para verificar.
+
+### Admin
+
+- **`resources/views/admin/dashboard.blade.php`**
+    - Métricas generales, lista de alumnos con links a progreso.
+- **`resources/views/admin/pdfs/*`**
+    - `index`: Lista PDFs con acciones CRUD.
+    - `create/edit`: Formularios con subida de archivos.
+- **`resources/views/admin/conjuntos/*`**
+    - `index`: Lista conjuntos con toggle activo, conteo preguntas.
+    - `create/edit`: Formularios con select PDF, campos básicos.
+    - `show`: Detalle conjunto + lista preguntas con acciones.
+- **`resources/views/admin/preguntas/*`**
+    - `create/edit`: Formularios complejos para preguntas: JSON para config y respuesta.
+- **`resources/views/admin/alumnos/progreso.blade.php`**
+    - Progreso por conjunto: sesiones, puntuaciones, detalle preguntas.
+
+### Observaciones
+
+- `resources/views/preguntas/index.blade.php` existe pero no está enlazada en rutas (ruta `preguntas.index` no definida).
+- `resources/views/layouts/app.blade.php`: Layout principal con navegación, dark mode, responsive.
+- Diseño consistente: Cards con `bg-white/95 dark:bg-neutral-900/90`, gradientes, flash messages.
+
+## ✅ Tipos de interacción soportados
+
+Todos los tipos tienen un archivo en `resources/views/preguntas/tipos/` (HTML) y otro en `resources/views/preguntas/scripts/` (JavaScript).
+
+| Tipo                     | Descripción                                 | `configuracion` clave                                                  | `respuesta_correcta` formato |
+| ------------------------ | ------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------- |
+| `seleccion_simple`       | Elige 1 opción (texto o imagen)             | `opciones: [{id, tipo, valor}]`                                        | `["B"]`                      |
+| `seleccion_multiple`     | Elige N opciones con checkboxes             | `opciones: [{id, valor}]`                                              | `["A","C"]`                  |
+| `ordenar`                | Drag & drop para ordenar (SortableJS)       | `elementos: [{id, nombre}]`                                            | `[["1","2","3"]]`            |
+| `grid_seleccion`         | Marcar celdas en cuadrícula                 | `labels_filas, labels_columnas, estado_inicial, numeros_celdas`        | `[{fila, columna}]`          |
+| `emparejar`              | Relacionar con selects                      | `objetos: [{id, nombre}], destinos: [{id, nombre}]`                    | `[{objeto, destino}]`        |
+| `rellenar`               | Colorear áreas con paleta                   | `colores_disponibles, areas: [{id, nombre}]`                           | `[{area, color}]`            |
+| `texto_libre`            | Input de texto o número                     | `tipo_respuesta: "numero"\|"texto", min, max`                          | `["4"]`                      |
+| `completar`              | Flexible: checkboxes, slots, blanks, string | Varía según subtipo                                                    | Varía                        |
+| `colocar_piezas`         | Drag & drop de abejas en panal hexagonal    | `celdas_hexagonales: 7\|19, abejas: [{id, imagen}]`                    | `[{abeja, celda}]`           |
+| `colorear_hexagonos`     | Pintar pirámide de hexágonos                | `colores_disponibles, filas, hexagonos_iniciales: [{posicion, color}]` | `[{posicion, color}]`        |
+| `tejer_alfombra`         | Grid NxM con símbolos/colores               | `filas, columnas, simbolos_disponibles`                                | Array 2D de letras           |
+| `rompecabezas_hexagonos` | Colocar piezas en grid hexagonal            | `piezas_disponibles: [{id, color, imagen}], estructura`                | `[{pieza, fila, columna}]`   |
+
+### SortableJS
+
+Los tipos `ordenar` y `completar` (subtipo imagen) cargan SortableJS desde CDN. `preguntas/show.blade.php` lo inyecta automáticamente cuando el tipo lo requiere:
+
+```blade
+@if(in_array($pregunta->tipo_interaccion, ['ordenar', 'completar']))
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 @endif
 ```
 
-### Mejoras Pendientes
+### ✅ Implementados (7 tipos - 89% de preguntas)
 
-| Prioridad | Tarea                          | Descripción                  | Archivos                                                              |
-| --------- | ------------------------------ | ---------------------------- | --------------------------------------------------------------------- |
-| 🔴 Alta   | Implemente 3 tipos faltantes   | Preguntas 15, 21, 26         | `app/Enums/TipoInteraccion.php`, `resources/views/preguntas/tipos/**` |
-| 🟡 Media  | Valide tipo_interaccion en BD  | Evitar tipos inválidos       | Migración, modelo                                                     |
-| 🟡 Media  | Agregue seeders detallados     | Datos de prueba completos    | `database/seeders/PreguntasSeeder.php`                                |
-| 🟡 Media  | Implemente tests completos     | Coverage >80%                | `tests/Feature/`, `tests/Unit/`                                       |
-| 🟢 Baja   | Agregue comentarios en seeders | Mejorar mantenibilidad       | `database/seeders/`                                                   |
-| 🟢 Baja   | Documente API de interacciones | Para futuros desarrolladores | Wiki/Docs                                                             |
+- **`seleccion_simple`**: Elegir 1 opción (imagen/texto). Preguntas: 13. Archivos: tipos/ + scripts/. Validación: ✓
+- **`seleccion_multiple`**: Elegir varias opciones. Preguntas: 2. Validación: ✓
+- **`ordenar`**: Drag & drop para ordenar. Preguntas: 4. Dependencias: SortableJS. Validación: ✓
+- **`grid_seleccion`**: Marcar celdas en grid. Preguntas: 2. Validación: ✓
+- **`emparejar`**: Unir elementos con líneas. Preguntas: 1. Validación: ✓
+- **`rellenar`**: Colorear/rellenar espacios. Preguntas: 1. Validación: ✓
+- **`texto_libre`**: Respuesta escrita. Preguntas: 1. Validación: ✓
 
-## 📚 Recursos Adicionales
+### ❌ No implementados (3 tipos - 11% de preguntas)
 
-- [Laravel 12 Documentation](https://laravel.com/docs/12.x)
-- [Livewire 3 Documentation](https://livewire.laravel.com)
-- [Volt Documentation](https://livewire.laravel.com/docs/volt)
-- [Tailwind CSS Documentation](https://tailwindcss.com)
-- [Docker Documentation](https://docs.docker.com)
-- [Bebras International](https://www.bebras.org/)
+- **`colocar_piezas`**: Pregunta 15 - Panal de Abejas. Grid hexagonal con 19 celdas, 7 abejas con reglas de posicionamiento.
+- **`colorear_hexagonos`**: Pregunta 21 - Hexágonos de Colores. Estructura piramidal de 5 filas, 3 colores.
+- **`tejer_alfombra`**: Pregunta 26 - Tejiendo Alfombras. Grid 6x6 con símbolos/colores.
 
-## 💬 Convenciones del Proyecto
+## 📌 Observaciones y puntos pendientes
 
-### Nomenclatura
+### ✅ Corregidos
 
-- **Modelos**: PascalCase (`Pregunta`, `ProgresoUsuario`)
-- **Controladores**: PascalCase + "Controller" (`PreguntaController`)
-- **Vistas**: snake_case + `.blade.php` (`show.blade.php`)
-- **Rutas**: kebab-case (`preguntas`, `admin-dashboard`)
-- **Métodos**: camelCase (`verificarRespuesta()`)
-- **BD**: snake_case (`tipo_interaccion`, `respuesta_correcta`)
+- **Vista `preguntas.show`**: Agregada validación `@if(!empty($pregunta->tipo_interaccion))` para evitar errores con tipos vacíos.
+- **Scripts JS**: Mismo fix aplicado.
+- **DashboardController::verProgreso()**: Variable `$usuario` correctamente definida (bug reportado era incorrecto).
 
-### Estructura de Vistas
+### ⚠️ Pendientes
 
+- **`App\Enums\TipoInteraccion.php`**: Incluye tipos no implementados (`colocar_piezas`, `colorear_hexagonos`, `tejer_alfombra`, `completar`). Debería reflejar solo implementados o agregar implementaciones.
+- **`resources/views/preguntas/index.blade.php`**: Vista huérfana sin ruta (`preguntas.index` no definida).
+- **AdminPreguntaController**: Lista de tipos codificada localmente; usar `TipoInteraccion::values()`.
+- **Implementar tipos faltantes**: 3 preguntas sin funcionalidad completa.
+- **Validación en PreguntaController**: Manejo específico para tipos vacíos (actualmente retorna `false`).
+
+### 🔄 Mejoras futuras
+
+- Unificar tipos en Enum con implementaciones.
+- Agregar tests para tipos de interacción.
+- Optimizar consultas N+1 en vistas (eager loading).
+- Implementar cache para configuraciones estáticas.
+
+## 🧪 Datos iniciales
+
+El proyecto incluye seeders para:
+
+- `DatabaseSeeder`
+- `UserSeeder`
+- `PdfSeeder`
+- `ConjuntoSeeder`
+- `PreguntasSeeder`
+
+Estos seeders crean usuarios de ejemplo, conjuntos, PDFs y preguntas Bebras.
+
+## 📌 Estado actual del sistema
+
+El proyecto está implementado como un sistema funcional de gestión y resolución de cuestionarios Bebras, con soporte para:
+
+- ✅ Sesión de alumno por conjunto (única por par user-conjunto)
+- ✅ Registro de respuesta por pregunta (única por par user-pregunta)
+- ✅ Puntuación de conjunto (conteo de correctas)
+- ✅ Administración de recursos PDF (subida, asociación a conjuntos)
+- ✅ Administración de conjuntos y preguntas (CRUD completo)
+- ✅ 7 tipos de interacción implementados (89% de preguntas)
+- ✅ Autenticación con roles (admin/alumno) y 2FA
+- ✅ UI responsive con dark mode y diseño consistente
+- ✅ Validaciones de seguridad (middleware admin, abort 404/403)
+- ✅ Prevención de doble envío en respuestas
+
+### 🔄 Áreas de mejora identificadas
+
+- **Completitud**: 3 preguntas sin tipo de interacción (11%)
+- **Consistencia**: Enum vs implementaciones, rutas huérfanas
+- **Rendimiento**: Consultas N+1 en algunas vistas
+- **Mantenibilidad**: Código duplicado en validaciones, tipos codificados
+
+### 🚀 Próximos pasos recomendados
+
+1. **Implementar tipos faltantes**: `colocar_piezas`, `colorear_hexagonos`, `tejer_alfombra`
+2. **Limpiar Enum**: Sincronizar con implementaciones reales
+3. **Agregar tests**: Cobertura para controladores y tipos de interacción
+4. **Optimizar DB**: Eager loading en consultas complejas
+5. **Documentar API**: Endpoints para futuras integraciones
+
+## 📁 Resumen de carpetas clave
+
+- **`app/`**: Lógica de negocio. Modelos con relaciones Eloquent, controladores CRUD, enums para tipos, middleware de auth.
+- **`database/`**: Esquema y datos. Migraciones con foreign keys y JSON, seeders para datos Bebras completos.
+- **`public/`**: Punto de entrada y estáticos. `index.php` para Laravel, `storage/` link para archivos subidos, `build/` assets Vite.
+- **`resources/`**: Vistas y assets. Blade templates con diseño consistente, JS para interactividad, CSS Tailwind.
+- **`routes/`**: Definición de endpoints. Rutas autenticadas para alumnos, admin protegidas, sin rutas huérfanas críticas.
+- **`storage/`**: Archivos privados. PDFs/imágenes subidas, logs de aplicación, cache/framework.
+
+## 🔐 Autenticación
+
+- **Laravel Fortify** con soporte 2FA activado
+- **Middleware `admin`**: `app/Http/Middleware/AdminMiddleware.php` — verifica `user->isAdmin()`
+- **Registro en** `bootstrap/app.php` como alias `'admin'`
+- Post-login: `GET /dashboard` redirige a `admin.dashboard` o `conjuntos.index` según rol
+
+## 📦 Storage
+
+Los archivos subidos van a `storage/app/public/`:
+
+- `pdfs/` → PDFs subidos por el admin
+
+El symlink `public/storage → storage/app/public` se crea con:
+
+```bash
+sail artisan storage:link
 ```
-resources/views/preguntas/
-├── show.blade.php           # Vista principal
-├── tipos/                   # Tipos de interacción
-│   ├── seleccion_simple.blade.php
-│   ├── seleccion_multiple.blade.php
-│   └── ...
-└── scripts/                 # Validación y lógica
-    ├── seleccion_simple.blade.php
-    ├── seleccion_multiple.blade.php
-    └── ...
+
+Las rutas de imágenes en `configuracion` JSON de preguntas son **rutas relativas** desde storage, ejemplo: `"valor": "imagenes/tabla-libros.png"`. En las vistas se accede con `asset('storage/' . $ruta)` o `Storage::url($ruta)`.
+
+## 🌱 Seeders
+
+DatabaseSeeder
+├── UserSeeder → admin@bebras.mx (admin123) + alumno@bebras.mx (alumno123)
+├── PdfSeeder → Registro placeholder del PDF de Primavera 2025
+└── ConjuntoSeeder → Conjunto "Reto Bebras MX Primavera 2025" con 5 preguntas de ejemplo
+
+**Nota**: `PreguntasSeeder.php` es un archivo legacy incompatible con el esquema actual. No está incluido en `DatabaseSeeder`. Eliminar o ignorar.
+
+## ⚠️ Consideraciones importantes
+
+### Al crear preguntas
+
+1. **`configuracion`** y **`respuesta_correcta`** se ingresan como JSON en el formulario admin. El controlador convierte el string a array antes de guardar.
+2. Las **imágenes** referenciadas en `configuracion` deben subirse primero desde **Admin → Imágenes** y copiar la ruta exacta. _(Pendiente: ImagenController no implementado)_
+3. El campo `imagen_enunciado` e `imagen_explicacion` de la pregunta también son rutas de storage (no URLs completas).
+4. El formulario de creación incluye **plantillas JSON por tipo** que se cargan con el botón "↺ Cargar plantilla".
+
+### Al resolver preguntas
+
+- Un alumno **no puede responder dos veces** la misma pregunta (índice único en `progreso_usuarios`).
+- Un alumno **no puede volver a abrir** un conjunto terminado para responder más preguntas.
+- La verificación ocurre en el servidor (`PreguntaController::verificar()`), nunca en el cliente.
+
+### Storage en Docker
+
+Si el visor de PDFs o imágenes muestra 404:
+
+1. Ejecutar `sail artisan storage:link`
+2. Verificar que `APP_URL=http://localhost` en `.env`
+3. Verificar que el archivo existe en `storage/app/public/pdfs/` o `imagenes/`
+
+## 📋 Comandos útiles
+
+```bash
+# Reset completo con datos iniciales
+sail artisan migrate:fresh --seed && sail artisan storage:link
+
+# Limpiar cachés
+sail artisan optimize:clear
+
+# Shell del contenedor
+sail shell
+
+# Tinker (consola interactiva)
+sail artisan tinker
+
+# Ver rutas
+sail artisan route:list --path=admin
+
+# Compilar assets (desarrollo)
+sail npm run dev
+
+# Compilar assets (producción)
+sail npm run build
 ```
 
-Cada tipo tiene:
+## 📊 Estado del sistema
 
-1. **Vista HTML**: Renderiza la pregunta
-2. **Script JS**: Valida y procesa respuesta
-
-### Validación de Respuestas
-
-En `PreguntaController@verificar()`:
-
-```php
-// Método privado para cada tipo
-private function validarSeleccionSimple($respuesta, $correcta) { ... }
-private function validarSeleccionMultiple($respuesta, $correcta) { ... }
-```
-
-## 🤝 Contribuciones
-
-### Para agregar una nueva pregunta:
-
-1. Crear entrada en `PreguntasSeeder`
-2. Asignar `tipo_interaccion` válido
-3. Crear/verificar vista en `resources/views/preguntas/tipos/`
-4. Crear/verificar script en `resources/views/preguntas/scripts/`
-5. Verificar método de validación en `PreguntaController`
-
-### Para agregar nuevo tipo de interacción:
-
-1. Agregar entrada en `app/Enums/TipoInteraccion.php`
-2. Crear vista en `resources/views/preguntas/tipos/{tipo}.blade.php`
-3. Crear script en `resources/views/preguntas/scripts/{tipo}.blade.php`
-4. Implementar método de validación en `PreguntaController`
-5. Agregar tests en `tests/Feature/`
-
-## 📞 Soporte
-
-Para problemas específicos de despliegue en Laravel Cloud, consulta:
-
-- [LARAVEL_CLOUD_SETUP.md](LARAVEL_CLOUD_SETUP.md)
-- [RESUMEN_TIPOS_INTERACCION.md](RESUMEN_TIPOS_INTERACCION.md)
-
----
-
-**Última actualización**: Abril 2026  
-**Estado**: En desarrollo activo ✅
+| Característica                        | Estado                               |
+| ------------------------------------- | ------------------------------------ |
+| Autenticación + 2FA                   | ✅                                   |
+| Roles admin/alumno                    | ✅                                   |
+| CRUD de PDFs                          | ✅                                   |
+| CRUD de Conjuntos                     | ✅                                   |
+| CRUD de Preguntas                     | ✅                                   |
+| Formulario guiado con plantillas JSON | ✅                                   |
+| 7 tipos de interacción                | ✅                                   |
+| Sesiones de conjunto por alumno       | ✅                                   |
+| Registro de progreso por pregunta     | ✅                                   |
+| Dashboard con métricas                | ✅ (admin y alumno)                  |
+| Visor PDF embebido                    | ✅                                   |
+| Dark mode responsive                  | ✅                                   |
+| Protección doble envío                | ✅                                   |
+| Navegación entre preguntas            | ✅ (miniaturas + anterior/siguiente) |
+| Gestión de Imágenes                   | ❌ (Pendiente)                       |
+| Biblioteca de PDFs para alumnos       | ❌ (Pendiente)                       |
