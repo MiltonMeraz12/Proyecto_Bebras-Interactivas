@@ -53,6 +53,20 @@ jobs:
       - name: 📦 Instalar Dependencias
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
 
+      - name: 📦 Instalar dependencias de Node
+        run: npm install
+
+      - name: 🎨 Compilar Assets (Vite)
+        run: npm run build
+
+      - name: 📂 Preparar directorios de almacenamiento
+        run: |
+          mkdir -p storage/framework/cache/data
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+          chmod -R 777 storage bootstrap/cache
+
       - name: 📂 Preparar directorios de almacenamiento
         run: |
           mkdir -p storage/framework/cache/data
@@ -73,7 +87,9 @@ jobs:
           touch database/database.sqlite
 
       - name: 🌐 Levantar Servidor Local (Background)
-        run: php artisan serve --env=testing &
+        run: |
+          php artisan serve --env=testing &
+          sleep 5
         env:
           APP_ENV: testing
           APP_URL: "http://127.0.0.1:8000"

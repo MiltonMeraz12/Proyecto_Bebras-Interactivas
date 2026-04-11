@@ -31,6 +31,7 @@ class FlujoBebrasTest extends DuskTestCase
     {
         $this->browse(function (Browser $browser) {
             $browser->visit('/login')
+                    ->waitFor('input[name="email"]')
                     ->type('email', 'admin@bebras.mx')
                     ->type('password', 'temporal1')
                     ->click('button[type="submit"]') 
