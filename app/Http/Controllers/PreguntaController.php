@@ -48,7 +48,10 @@ class PreguntaController extends Controller
         $siguiente= $siguienteId ? Pregunta::find($siguienteId) : null;
         $progresoUsuario = $progreso;
 
-        return view('preguntas.show', compact(
+        /** @var view-string $viewName */
+        $viewName = 'preguntas.show';
+
+        return view($viewName, compact(
             'conjunto', 'pregunta', 'progreso', 'anterior', 'siguiente', 'preguntas', 'posicion', 'progresoUsuario', 'sesion'
         ));
     }

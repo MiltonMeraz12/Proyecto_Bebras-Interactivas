@@ -62,7 +62,10 @@ class ImagenController extends Controller
 
     public function show(ArchivoImagen $imagen): View
     {
-        return view('admin.imagenes.show', compact('imagen'));
+        /** @var view-string $view */
+        $view = 'admin.imagenes.show';
+        
+        return view($view, compact('imagen'));
     }
 
     // API para el selector de imágenes en formularios de preguntas
